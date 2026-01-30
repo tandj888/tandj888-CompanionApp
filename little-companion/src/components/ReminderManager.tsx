@@ -7,61 +7,50 @@ import { useNavigate } from 'react-router-dom';
 
 export default function ReminderManager() {
   const { user, updateUser } = useUserStore();
-  const { currentGoal } = useGoalStore(); // Use global goal or iterate all goals if possible. For now we just use currentGoal as context.
-  // Actually we should iterate all goals, but the store structure is simple. Let's assume we check the "active" goal or just the current one for now.
-  // Better: We need access to all goals? goalStore only exposes currentGoal. Let's assume user is focused on one goal.
-  // Wait, goalStore should manage all goals? No, typically apps like this might have a list.
-  // Looking at goalStore: `currentGoal: Goal | null`. It seems this app only supports ONE active goal at a time based on the store design?
-  // Let's verify goalStore.
-  
+  const { goals, updateGoal } = useGoalStore(); // Use goals list
   const { getTodayCheckIn } = useCheckInStore();
   const navigate = useNavigate();
   const [showNotification, setShowNotification] = useState(false);
 
   useEffect(() => {
-    // We will only check the current active goal for now, as the store seems to handle one goal.
-    // If the app supports multiple goals, we would need to fetch the list.
-    const goal = useGoalStore.getState().currentGoal;
-    
-    if (!goal) return;
-
     const checkReminder = () => {
       const now = new Date();
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const nowTs = Date.now();
-      const isCheckedIn = !!getTodayCheckIn();
+      
+      // Check each goal
+      goals.forEach(goal => {
+          const isCheckedIn = !!getTodayCheckIn(goal.id);
 
-      // 1. Check Personal Reminder (Global setting, kept for backward compatibility or general reminder)
-      if (user?.settings.reminder?.enabled && !isCheckedIn) {
-         // ... (existing logic) ...
-         // We can simplify or keep it. Let's keep it but prioritize Goal settings.
-      }
+          // 1. Check Goal Deadline / Supervisor Notification
+          if (goal.deadlineTime && !isCheckedIn) {
+              const [deadHour, deadMinute] = goal.deadlineTime.split(':').map(Number);
+              const deadMinutes = deadHour * 60 + deadMinute;
+              
+              if (currentMinutes > deadMinutes) {
+                  const lastNotified = goal.lastDeadlineNotified || 0;
+                  // Notify every 30 mins if overdue
+                  if (nowTs - lastNotified > 30 * 60 * 1000) {
+                      // Notify User (Just show one notification for simplicity for now, or queue them)
+                      setShowNotification(true);
+                      
+                      // Notify Supervisor
+                      if (goal.supervisor?.enabled && goal.supervisor.notifyOnOverdue) {
+                          const msg = `[模拟] 已通过${goal.supervisor.method === 'sms' ? '短信' : 'APP'}通知监督人 ${goal.supervisor.name}：${user?.nickname} 截止 ${goal.deadlineTime} 仍未打卡 ${goal.name}！`;
+                          console.log(msg);
+                      }
 
-      // 2. Check Goal Deadline / Supervisor Notification
-      if (goal.deadlineTime && !isCheckedIn) {
-          const [deadHour, deadMinute] = goal.deadlineTime.split(':').map(Number);
-          const deadMinutes = deadHour * 60 + deadMinute;
-          
-          if (currentMinutes > deadMinutes) {
-              const lastNotified = goal.lastDeadlineNotified || 0;
-              // Notify every 30 mins if overdue
-              if (nowTs - lastNotified > 30 * 60 * 1000) {
-                  // Notify User
-                  setShowNotification(true);
-                  
-                  // Notify Supervisor
-                  if (goal.supervisor?.enabled && goal.supervisor.notifyOnOverdue) {
-                      const msg = `[模拟] 已通过${goal.supervisor.method === 'sms' ? '短信' : 'APP'}通知监督人 ${goal.supervisor.name}：${user?.nickname} 截止 ${goal.deadlineTime} 仍未打卡 ${goal.name}！`;
-                      console.log(msg);
+                      // Update goal state to record notification
+                      updateGoal(goal.id, {
+                          lastDeadlineNotified: nowTs
+                      });
                   }
-
-                  // Update goal state to record notification
-                  useGoalStore.getState().updateGoal({
-                      lastDeadlineNotified: nowTs
-                  });
               }
           }
-      }
+      });
+      
+      // Global Reminder (Deprecated or fallback)
+      // if (user?.settings.reminder?.enabled) { ... }
     };
 
     const timer = setInterval(checkReminder, 60000); 
@@ -71,7 +60,7 @@ export default function ReminderManager() {
         clearInterval(timer);
         clearTimeout(initialTimer);
     };
-  }, [user, getTodayCheckIn]);
+  }, [user, goals, getTodayCheckIn, updateGoal]);
 
   if (!showNotification) return null;
 
