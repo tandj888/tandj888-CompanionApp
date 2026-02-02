@@ -15,18 +15,29 @@ interface CreateGroupConfig {
     startTime?: string;
     endTime?: string;
     rewards?: Reward[];
+    timeRestriction?: {
+        enabled: boolean;
+    };
+    supervisor?: {
+        enabled: boolean;
+        name: string;
+        contact: string;
+        method: 'sms' | 'app';
+        notifyOnCheckIn: boolean;
+        notifyOnOverdue: boolean;
+    };
 }
 
 interface GroupState {
   groups: Group[];
   createGroup: (config: CreateGroupConfig) => Promise<void>;
-  joinGroup: (code: string, user: User) => Promise<boolean>;
+  joinGroup: (code: string, user: User) => Promise<{ success: boolean; code?: string; message?: string }>;
   leaveGroup: (groupId: string, userId: string) => void;
   dissolveGroup: (groupId: string) => void;
   kickMember: (groupId: string, memberId: string) => void;
   updateGroup: (groupId: string, updates: Partial<Group>) => void;
   refreshInviteCode: (groupId: string) => void;
-  syncUserCheckIn: (userId: string, hasCheckedIn: boolean) => void;
+  syncUserCheckIn: (groupId: string, userId: string, hasCheckedIn: boolean) => void;
   simulateMemberJoin: (groupId: string) => void;
   getGroupShareToken: (groupId: string) => string;
   syncWithBackend: () => Promise<void>;
@@ -38,15 +49,31 @@ export const useGroupStore = create<GroupState>()(
       groups: [],
       
       createGroup: async (config) => {
+        const user = useUserStore.getState().user;
+        if (!user || !user.phone) {
+             throw new Error("请先登录");
+        }
+
         const streak = useCheckInStore.getState().getStreak();
-        const newGroup: Group = {
-            id: 'group-' + Date.now(),
+        // Prepare payload without ID (let backend generate it)
+        // But we need to structure it as a Group object minus ID for the API?
+        // Actually the API expects Partial<Group> & { userId }.
+        
+        // We construct the "Member" part on backend? 
+        // No, backend GroupController.ts says:
+        // const { userId, ...groupData } = req.body;
+        // group.id = groupData.id || ...
+        // It also creates the leader member automatically.
+        
+        // So we just send the group metadata.
+        
+        const newGroupPayload: Partial<Group> = {
             name: config.name,
             description: config.description,
             leaderId: config.creator.id,
-            members: [{ ...config.creator, hasCheckedInToday: false, streak }],
+            // members: [], // Backend handles leader creation
             createTime: Date.now(),
-            inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+            inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(), // We can still suggest one or let backend do it. Backend uses what we send.
             inviteExpires: Date.now() + 24 * 60 * 60 * 1000,
             maxMembers: config.maxMembers,
             status: 'active',
@@ -54,23 +81,37 @@ export const useGroupStore = create<GroupState>()(
             endDate: config.endDate,
             startTime: config.startTime,
             endTime: config.endTime,
-            rewards: config.rewards
+            rewards: config.rewards,
+            timeRestriction: config.timeRestriction,
+            supervisor: config.supervisor
         };
-        
-        set((state) => ({
-          groups: [newGroup, ...state.groups]
-        }));
 
-        const user = useUserStore.getState().user;
-        if (user && user.phone) {
-             try {
-                 const savedGroup = await groupApi.createGroup({ ...newGroup, userId: user.id });
+        try {
+             const savedGroup = await groupApi.createGroup({ ...newGroupPayload, userId: user.id });
+             
+             if (savedGroup && savedGroup.id) {
+                 // If backend returns members, use them. Otherwise, manually add leader.
+                 let groupWithMember: Group;
+                 
+                 if (savedGroup.members && savedGroup.members.length > 0) {
+                      groupWithMember = savedGroup as Group;
+                 } else {
+                      const leaderMember = { ...config.creator, hasCheckedInToday: false, streak };
+                      groupWithMember = { ...savedGroup, members: [leaderMember] } as Group;
+                 }
+
                  set((state) => ({
-                     groups: state.groups.map(g => g.id === newGroup.id ? savedGroup : g)
+                     groups: [groupWithMember, ...state.groups]
                  }));
-             } catch (e) {
-                 console.error("Failed to create group on server", e);
+                 
+                 // Ensure list reflects server state immediately
+                 await get().syncWithBackend();
+             } else {
+                 throw new Error("服务器返回数据异常");
              }
+        } catch (e: any) {
+             console.error("Failed to create group on server", e);
+             throw new Error(e.response?.data?.message || "创建失败，请检查网络");
         }
       },
 
@@ -96,10 +137,44 @@ export const useGroupStore = create<GroupState>()(
                  if (result && result.groupId) {
                      // Fetch groups to update local state
                      await get().syncWithBackend();
-                     return true;
+                     
+                     // FORCE UPDATE: Ensure I am in the member list of the joined group locally
+                     // This handles cases where backend getGroups returns the group but members list is stale/cached
+                     // or if syncWithBackend failed but we want to show optimistic success (though without group data we can't do much)
+                     
+                     const groupExists = get().groups.find(g => g.id === result.groupId);
+                     
+                     if (groupExists) {
+                         set(state => ({
+                             groups: state.groups.map(g => {
+                                 if (g.id === result.groupId) {
+                                     const isMember = g.members.some(m => m.id === user.id);
+                                     if (!isMember) {
+                                         return {
+                                             ...g,
+                                             members: [...g.members, { ...user, hasCheckedInToday: false, streak: currentStreak }]
+                                         };
+                                     }
+                                 }
+                                 return g;
+                             })
+                         }));
+                     } else {
+                         // If sync didn't get the group (e.g. latency), we might want to trigger another sync or warn.
+                         // But since we don't have the group data, we can't add it locally.
+                         // We will rely on the user refreshing or the next sync.
+                         // To help the user, we can try one more sync after a short delay?
+                         setTimeout(() => get().syncWithBackend(), 1000);
+                     }
+                     
+                     return { success: true, code: 'joined' };
                  }
-             } catch (e) {
+             } catch (e: any) {
                  console.log("Backend join failed, falling back to local/token logic", e);
+                 // If backend explicitly says "already member", handle it
+                 if (e.response?.data?.message?.includes('already')) {
+                     return { success: true, code: 'already_joined', message: '已在陪团中' };
+                 }
              }
         }
 
@@ -113,7 +188,9 @@ export const useGroupStore = create<GroupState>()(
                     const existingLocal = get().groups.find(g => g.id === groupData.id);
                     
                     if (existingLocal) {
-                        if (existingLocal.members.some(m => m.id === user.id)) return false;
+                        if (existingLocal.members.some(m => m.id === user.id)) {
+                             return { success: true, code: 'already_joined', message: '已在陪团中' };
+                        }
                         
                         set((state) => ({
                             groups: state.groups.map(g => 
@@ -130,7 +207,7 @@ export const useGroupStore = create<GroupState>()(
                              groupApi.syncGroup({ ...groupData, userId: user.id }).catch(console.error);
                         }
                         
-                        return true;
+                        return { success: true, code: 'joined' };
                     } else {
                         // New Group from Token
                         const joinedGroup = { ...groupData, members: [...groupData.members, { ...user, hasCheckedInToday: false, streak: currentStreak }] };
@@ -141,7 +218,7 @@ export const useGroupStore = create<GroupState>()(
                          if (user.phone) {
                              groupApi.syncGroup({ ...joinedGroup, userId: user.id }).catch(console.error);
                         }
-                        return true;
+                        return { success: true, code: 'joined' };
                     }
                 }
             }
@@ -152,8 +229,12 @@ export const useGroupStore = create<GroupState>()(
         // 3. Local match (for offline testing or same device)
         const targetGroup = get().groups.find(g => g.inviteCode === codeOrToken && g.status === 'active');
         if (targetGroup) {
-          if (targetGroup.members.some(m => m.id === user.id)) return false;
-          if (targetGroup.members.length >= targetGroup.maxMembers) return false;
+          if (targetGroup.members.some(m => m.id === user.id)) {
+               return { success: true, code: 'already_joined', message: '已在陪团中' };
+          }
+          if (targetGroup.members.length >= targetGroup.maxMembers) {
+               return { success: false, code: 'full', message: '陪团人数已满' };
+          }
           
           set((state) => ({
             groups: state.groups.map(g => 
@@ -162,10 +243,10 @@ export const useGroupStore = create<GroupState>()(
               : g
             )
           }));
-          return true;
+          return { success: true, code: 'joined' };
         }
 
-        return false;
+        return { success: false, code: 'invalid', message: '邀请码无效' };
       },
 
       leaveGroup: async (groupId, userId) => {
@@ -246,16 +327,20 @@ export const useGroupStore = create<GroupState>()(
         }));
       },
 
-      syncUserCheckIn: (userId, hasCheckedIn) => {
+      syncUserCheckIn: (groupId, userId, hasCheckedIn) => {
         set((state) => ({
-          groups: state.groups.map(g => ({
-            ...g,
-            members: g.members.map(m => 
-              m.id === userId
-              ? { ...m, hasCheckedInToday: hasCheckedIn, streak: hasCheckedIn ? m.streak + 1 : m.streak }
-              : m
-            )
-          }))
+          groups: state.groups.map(g => 
+            g.id === groupId
+            ? {
+                ...g,
+                members: g.members.map(m => 
+                  m.id === userId
+                  ? { ...m, hasCheckedInToday: hasCheckedIn, streak: hasCheckedIn ? m.streak + 1 : m.streak }
+                  : m
+                )
+              }
+            : g
+          )
         }));
       },
 
@@ -287,8 +372,18 @@ export const useGroupStore = create<GroupState>()(
           if (user && user.phone) {
               try {
                   const groups = await groupApi.getGroups(user.id);
-                  if (groups) {
-                      set({ groups });
+                  if (groups && Array.isArray(groups)) {
+                      // MERGE STRATEGY: 
+                      // 1. Keep local groups that are NOT in backend (offline created)
+                      // 2. Update/Add groups from backend
+                      // 3. DO NOT delete local groups just because backend didn't return them (unless we are sure)
+                      // But for now, let's just merge by ID.
+                      
+                      set((state) => {
+                          const backendGroupIds = new Set(groups.map(g => g.id));
+                          const localUnique = state.groups.filter(g => !backendGroupIds.has(g.id));
+                          return { groups: [...localUnique, ...groups] };
+                      });
                   }
               } catch (e) {
                   console.error("Failed to fetch groups", e);

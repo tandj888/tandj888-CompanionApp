@@ -46,10 +46,31 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onCheckIn }) => {
           </p>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {goal.rewards.map(reward => {
-              const isCumulative = reward.type === 'cumulative';
-              const currentProgress = isCumulative ? cumulative : streak;
-              const isUnlocked = currentProgress >= reward.days;
+              const consecutiveDays = reward.consecutiveDays || 0;
+              const cumulativeDays = reward.cumulativeDays || 0;
               
+              // Determine if unlocked:
+              // If only consecutive set, check streak
+              // If only cumulative set, check cumulative
+              // If both set, either condition unlocks? Or both?
+              // Let's assume ANY condition met is good enough for now, or display both.
+              // Actually based on GroupPage logic, we should probably check if ALL non-zero conditions are met, or just display them.
+              // Let's simplify and follow the merged display logic:
+              
+              const isStreakUnlocked = consecutiveDays > 0 && streak >= consecutiveDays;
+              const isCumulativeUnlocked = cumulativeDays > 0 && cumulative >= cumulativeDays;
+              
+              // If both exist, it's unlocked if BOTH are met? Or EITHER? 
+              // Usually merged rewards imply "Reach 7 days streak AND 10 days cumulative"? 
+              // Or maybe it's "7 days streak OR 10 days cumulative"?
+              // The request was "merged display".
+              // Let's assume if a reward has multiple conditions, ALL must be met to be "unlocked".
+              // But for partial progress, we show what is needed.
+              
+              const isUnlocked = (consecutiveDays > 0 ? isStreakUnlocked : true) && 
+                                 (cumulativeDays > 0 ? isCumulativeUnlocked : true) &&
+                                 (consecutiveDays > 0 || cumulativeDays > 0);
+
               return (
                 <div 
                   key={reward.id} 
@@ -65,7 +86,12 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onCheckIn }) => {
                       {reward.name}
                     </p>
                     <p className={`text-[10px] ${isUnlocked ? 'text-yellow-600' : 'text-pink-400'}`}>
-                      {isUnlocked ? '已达成' : `${isCumulative ? '累计' : '连续'}${reward.days}天`}
+                      {isUnlocked ? '已达成' : (
+                          <>
+                             {consecutiveDays > 0 && `连${consecutiveDays} `}
+                             {cumulativeDays > 0 && `累${cumulativeDays}`}
+                          </>
+                      )}
                     </p>
                   </div>
                 </div>

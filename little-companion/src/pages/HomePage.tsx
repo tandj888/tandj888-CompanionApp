@@ -2,24 +2,45 @@ import React, { useState } from 'react';
 import { useGoalStore } from '../stores/goalStore';
 import { useCheckInStore } from '../stores/checkInStore';
 import { useUserStore } from '../stores/userStore';
-import { Plus, CheckCircle2, Award, List, X, Filter } from 'lucide-react';
+import { Plus, CheckCircle2, Award, List, X, Filter, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { GoalCard } from '../components/GoalCard';
+import { CategoryIcon } from '../components/CategoryIcon';
+import { getIconForCategory } from '../utils/iconMapper';
 
 export default function HomePage() {
-  const { goals, categories } = useGoalStore();
+  const { goals, categories, addCategory, removeCategory } = useGoalStore();
   const { checkIn, getTodayCheckIn } = useCheckInStore();
   const { user, addStars } = useUserStore();
   const navigate = useNavigate();
   
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [currentCheckInGoalId, setCurrentCheckInGoalId] = useState<string | null>(null);
   const [anonymousMsg, setAnonymousMsg] = useState<string | undefined>();
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  
+  // New Category State
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('✨');
+
+  const handleAddCategory = () => {
+    if (newCategoryName.trim()) {
+        // Auto-select icon if it's still the default
+        const icon = newCategoryIcon === '✨' ? getIconForCategory(newCategoryName.trim()) : newCategoryIcon;
+        addCategory(newCategoryName.trim(), icon);
+        setNewCategoryName('');
+        setNewCategoryIcon('✨');
+        setIsAddingCategory(false);
+    }
+  };
+
 
   const handleCheckIn = (goalId: string) => {
+    setCurrentCheckInGoalId(goalId);
     checkIn(goalId);
     addStars(1);
     
@@ -176,7 +197,7 @@ export default function HomePage() {
 
                     {categories.filter(c => c.id !== 'all').map(cat => (
                         <div key={cat.id}>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 relative group">
                                 <button 
                                     onClick={() => {
                                         setSelectedCategory(cat.id);
@@ -187,11 +208,27 @@ export default function HomePage() {
                                     }`}
                                 >
                                     <span className="flex items-center gap-3">
-                                        <span className="text-2xl">{cat.icon}</span>
+                                        <CategoryIcon icon={cat.icon} className="text-2xl" />
                                         <span className="font-medium">{cat.name}</span>
                                     </span>
                                     {selectedCategory === cat.id && <CheckCircle2 size={18} className="text-indigo-600" />}
                                 </button>
+                                {/* Delete Custom Category Button */}
+                                {cat.isCustom && (
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if(confirm(`确定删除"${cat.name}"分类吗？`)) {
+                                                if (selectedCategory === cat.id) setSelectedCategory('all');
+                                                removeCategory(cat.id);
+                                            }
+                                        }}
+                                        className="absolute right-14 top-1/2 -translate-y-1/2 p-2 bg-white rounded-full text-red-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 transition-all shadow-sm"
+                                        title="删除分类"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                )}
                                 {/* Quick Add Button for this category */}
                                 <button
                                      onClick={() => {
@@ -206,6 +243,46 @@ export default function HomePage() {
                             </div>
                         </div>
                     ))}
+                    
+                    {/* Add Custom Category Section */}
+                    <div className="pt-2">
+                        {isAddingCategory ? (
+                            <div className="p-4 bg-gray-50 rounded-xl border border-indigo-100 animate-in slide-in-from-top-2">
+                                <div className="mb-3">
+                                    <input 
+                                        value={newCategoryName}
+                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                        className="w-full p-2 border rounded-lg"
+                                        placeholder="分类名称"
+                                        autoFocus
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={handleAddCategory} 
+                                        className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700"
+                                    >
+                                        添加
+                                    </button>
+                                    <button 
+                                        onClick={() => setIsAddingCategory(false)} 
+                                        className="flex-1 bg-white text-gray-500 py-2 rounded-lg text-sm border hover:bg-gray-50"
+                                    >
+                                        取消
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => setIsAddingCategory(true)}
+                                className="w-full p-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 font-medium hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Plus size={20} />
+                                添加自定义分类
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -234,7 +311,7 @@ export default function HomePage() {
               <button
                 onClick={() => {
                   setShowSuccessModal(false);
-                  navigate('/record/add');
+                  navigate(`/record/add?goalId=${currentCheckInGoalId}`);
                 }}
                 className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium"
               >

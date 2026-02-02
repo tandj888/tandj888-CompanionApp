@@ -7,6 +7,8 @@ import { UserController } from "./controller/UserController"
 import { GoalController } from "./controller/GoalController"
 import { CheckInController } from "./controller/CheckInController"
 import { GroupController } from "./controller/GroupController"
+import { MicroRecordController } from "./controller/MicroRecordController"
+import { GiftController } from "./controller/GiftController"
 
 dotenv.config()
 
@@ -20,6 +22,8 @@ const userController = new UserController()
 const goalController = new GoalController()
 const checkInController = new CheckInController()
 const groupController = new GroupController()
+const microRecordController = new MicroRecordController()
+const giftController = new GiftController()
 
 app.get("/", (req, res) => {
     res.send("Little Companion Backend API is Running")
@@ -52,6 +56,18 @@ app.post("/api/groups/leave", (req, res) => groupController.leaveGroup(req, res)
 app.post("/api/groups/dissolve", (req, res) => groupController.dissolveGroup(req, res))
 app.post("/api/groups/kick", (req, res) => groupController.kickMember(req, res))
 app.put("/api/groups/:id", (req, res) => groupController.updateGroup(req, res))
+
+// MicroRecord Routes
+app.post("/api/micro-records", (req, res) => microRecordController.createRecord(req, res))
+app.get("/api/micro-records", (req, res) => microRecordController.getRecords(req, res))
+app.delete("/api/micro-records/:id", (req, res) => microRecordController.deleteRecord(req, res))
+
+// Gift Routes
+app.get("/api/gifts", (req, res) => giftController.getGifts(req, res))
+app.post("/api/gifts", (req, res) => giftController.createGift(req, res))
+app.post("/api/gifts/redeem", (req, res) => giftController.redeemGift(req, res))
+app.delete("/api/gifts/:id", (req, res) => giftController.deleteGift(req, res))
+app.get("/api/redemptions", (req, res) => giftController.getRedemptions(req, res))
 
 // Legacy Routes (for testing)
 app.get("/users", async (req, res) => {

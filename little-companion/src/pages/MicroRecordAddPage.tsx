@@ -1,19 +1,53 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCheckInStore } from '../stores/checkInStore';
-import { ArrowLeft, Image as ImageIcon } from 'lucide-react';
-import { MicroRecord } from '../types';
+import { ArrowLeft, Camera as CameraIcon, X } from 'lucide-react';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 export default function MicroRecordAddPage() {
   const navigate = useNavigate();
-  const { checkIns, addRecordToToday } = useCheckInStore(); 
+  const [searchParams] = useSearchParams();
+  const goalId = searchParams.get('goalId');
+  const { addRecordToToday } = useCheckInStore(); 
   
   const [text, setText] = useState('');
+  const [image, setImage] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTakePhoto = async () => {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Camera
+      });
+
+      if (image.dataUrl) {
+        setImage(image.dataUrl);
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      // Fallback to file input if camera fails (e.g. on web without secure context)
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setImage(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    }
+  };
+
 
   const handleSave = () => {
-    if (!text) {
-        // Allow empty? "Text record (required, 1-50 chars)"
-        alert('请输入1-50字的文字记录');
+    if (!text && !image) {
+        alert('请输入文字或拍摄照片');
         return;
     }
     if (text.length > 50) {
@@ -21,7 +55,16 @@ export default function MicroRecordAddPage() {
         return;
     }
 
-    addRecordToToday(text);
+    if (goalId) {
+        addRecordToToday(goalId, text, image || undefined);
+    } else {
+        // Fallback: try to add to the first checkin of today if goalId missing
+        // But better to just alert
+        alert('未找到关联的打卡记录');
+        navigate('/');
+        return;
+    }
+    
     navigate('/');
   };
 
@@ -46,10 +89,33 @@ export default function MicroRecordAddPage() {
           className="w-full h-32 p-0 border-0 focus:ring-0 resize-none text-gray-700 placeholder-gray-400"
         />
         
+        {image && (
+            <div className="relative">
+                <img src={image} alt="Preview" className="w-full rounded-xl object-cover max-h-64" />
+                <button 
+                    onClick={() => setImage('')}
+                    className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full"
+                >
+                    <X size={16} />
+                </button>
+            </div>
+        )}
+
         <div className="border-t border-gray-100 pt-4">
-          <button className="w-20 h-20 bg-gray-50 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
-            <ImageIcon size={24} />
-            <span className="text-xs mt-1">上传图片</span>
+          <input 
+            type="file" 
+            accept="image/*" 
+            capture="environment"
+            className="hidden" 
+            ref={fileInputRef} 
+            onChange={handleFileChange}
+          />
+          <button 
+            onClick={handleTakePhoto}
+            className="w-20 h-20 bg-gray-50 rounded-xl flex flex-col items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors"
+          >
+            <CameraIcon size={24} />
+            <span className="text-xs mt-1">拍照</span>
           </button>
         </div>
       </div>

@@ -2,6 +2,8 @@ import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, OneT
 import { Goal } from "./Goal";
 import { CheckIn } from "./CheckIn";
 import { GroupMember } from "./GroupMember";
+import { MicroRecord } from "./MicroRecord";
+import { RedemptionRecord } from "./RedemptionRecord";
 
 @Entity()
 export class User {
@@ -63,4 +65,10 @@ export class User {
 
     @OneToMany(() => GroupMember, member => member.user)
     groupMemberships: GroupMember[];
+
+    @OneToMany(() => MicroRecord, record => record.user)
+    microRecords: MicroRecord[];
+
+    @OneToMany(() => RedemptionRecord, redemption => redemption.user)
+    redemptions: RedemptionRecord[];
 }

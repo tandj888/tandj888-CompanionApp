@@ -2,6 +2,8 @@ import { Entity, PrimaryColumn, Column, ManyToOne, OneToMany } from "typeorm";
 import { User } from "./User";
 import { CheckIn } from "./CheckIn";
 
+import { MicroRecord } from "./MicroRecord";
+
 @Entity()
 export class Goal {
     @PrimaryColumn()
@@ -51,4 +53,7 @@ export class Goal {
 
     @OneToMany(() => CheckIn, checkIn => checkIn.goal)
     checkIns: CheckIn[];
+
+    @OneToMany(() => MicroRecord, record => record.goal)
+    microRecords: MicroRecord[];
 }

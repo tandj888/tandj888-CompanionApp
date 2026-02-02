@@ -1,6 +1,7 @@
-import { Entity, PrimaryColumn, Column, ManyToOne } from "typeorm";
+import { Entity, PrimaryColumn, Column, ManyToOne, OneToOne, JoinColumn } from "typeorm";
 import { User } from "./User";
 import { Goal } from "./Goal";
+import { MicroRecord } from "./MicroRecord";
 
 @Entity()
 export class CheckIn {
@@ -39,4 +40,8 @@ export class CheckIn {
 
     @Column()
     goalId: string;
+
+    @OneToOne(() => MicroRecord, record => record.checkIn, { nullable: true })
+    @JoinColumn()
+    microRecord: MicroRecord;
 }

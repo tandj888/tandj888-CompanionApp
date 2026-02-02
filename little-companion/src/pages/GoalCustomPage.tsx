@@ -3,22 +3,63 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGoalStore } from '../stores/goalStore';
 import { ArrowLeft, Calendar, Clock, Plus, Trash2, Gift } from 'lucide-react';
 import { Goal, Reward } from '../types';
+import { CategoryIcon } from '../components/CategoryIcon';
 
 export default function GoalCustomPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const categoryParam = searchParams.get('category');
   
-  const { setGoal, categories, addCategory, removeCategory } = useGoalStore();
+  const { setGoal, goals, categories, addCategory, removeCategory } = useGoalStore();
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('');
   const [category, setCategory] = useState<string>(categoryParam || 'other');
   
-  // New time settings
+  // Edit mode initialization
+  const goalId = searchParams.get('id');
+  
+  React.useEffect(() => {
+    if (goalId) {
+        const goal = goals.find(g => g.id === goalId);
+        if (goal) {
+            setName(goal.name);
+            setDuration(goal.duration.toString());
+            setCategory(goal.category);
+            setFrequency(goal.frequency);
+            if (goal.intervalDays) setIntervalDays(goal.intervalDays.toString());
+            
+            // Time settings
+            if (goal.startDate) setStartDate(goal.startDate);
+            if (goal.endDate) setEndDate(goal.endDate);
+            if (goal.startTime) setStartTime(goal.startTime);
+            if (goal.endTime) setEndTime(goal.endTime);
+            if (goal.timeRestriction?.enabled) {
+                setTimeRestrictionEnabled(true);
+            }
+            if (goal.deadlineTime) setDeadlineTime(goal.deadlineTime);
+            
+            // Rewards - Critical fix: Load existing rewards
+            if (goal.rewards) {
+                setRewards(goal.rewards);
+            }
+            
+            // Supervisor
+            if (goal.supervisor?.enabled) {
+                setEnableSupervisor(true);
+                setSupervisorName(goal.supervisor.name);
+                setSupervisorContact(goal.supervisor.contact);
+                setSupervisorMethod(goal.supervisor.method);
+                setNotifyOnCheckIn(goal.supervisor.notifyOnCheckIn ?? true);
+                setNotifyOnOverdue(goal.supervisor.notifyOnOverdue ?? true);
+            }
+        }
+    }
+  }, [goalId, goals]);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [timeRestrictionEnabled, setTimeRestrictionEnabled] = useState(false);
   const [deadlineTime, setDeadlineTime] = useState('');
   
   // Frequency settings
@@ -36,46 +77,42 @@ export default function GoalCustomPage() {
   // Rewards settings
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [isAddingReward, setIsAddingReward] = useState(false);
-  const [newRewardDays, setNewRewardDays] = useState('');
+  const [newRewardConsecutiveDays, setNewRewardConsecutiveDays] = useState('');
+  const [newRewardCumulativeDays, setNewRewardCumulativeDays] = useState('');
   const [newRewardName, setNewRewardName] = useState('');
   const [newRewardIcon, setNewRewardIcon] = useState('🎁');
-  const [newRewardType, setNewRewardType] = useState<'consecutive' | 'cumulative'>('consecutive');
 
   const handleAddReward = () => {
-    if (!newRewardDays || !newRewardName) return;
-    const days = parseInt(newRewardDays);
-    if (isNaN(days) || days <= 0) return;
+    if (!newRewardName) {
+        alert('请输入奖励名称');
+        return;
+    }
+    const consDays = parseInt(newRewardConsecutiveDays);
+    const cumDays = parseInt(newRewardCumulativeDays);
+    
+    if ((isNaN(consDays) || consDays <= 0) && (isNaN(cumDays) || cumDays <= 0)) {
+        alert('请至少设置一种打卡天数要求');
+        return;
+    }
     
     setRewards([...rewards, {
       id: 'reward-' + Date.now(),
-      days,
+      consecutiveDays: !isNaN(consDays) && consDays > 0 ? consDays : undefined,
+      cumulativeDays: !isNaN(cumDays) && cumDays > 0 ? cumDays : undefined,
       name: newRewardName,
       icon: newRewardIcon,
-      type: newRewardType
     }]);
     setIsAddingReward(false);
-    setNewRewardDays('');
+    setNewRewardConsecutiveDays('');
+    setNewRewardCumulativeDays('');
     setNewRewardName('');
-    setNewRewardType('consecutive');
   };
 
   const removeReward = (id: string) => {
     setRewards(rewards.filter(r => r.id !== id));
   };
 
-  // Category management
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryIcon, setNewCategoryIcon] = useState('✨'); // Default icon
-
-  const handleAddCategory = () => {
-    if (!newCategoryName) return;
-    addCategory(newCategoryName, newCategoryIcon);
-    setIsAddingCategory(false);
-    setNewCategoryName('');
-  };
-
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!name || !duration) {
       alert('请填写目标名称和单次耗时');
       return;
@@ -91,31 +128,40 @@ export default function GoalCustomPage() {
     }
 
     // Confirm
-    if (confirm(`确定创建目标"${name}"吗？`)) {
-        setGoal({
-            id: 'goal-' + Date.now(),
-            name,
-            duration: durationNum,
-            category,
-            frequency,
-            intervalDays: frequency === 'custom' ? parseInt(intervalDays) : undefined,
-            templateId: 'custom',
-            startDate: startDate || undefined,
-            endDate: endDate || undefined,
-            startTime: startTime || undefined,
-            endTime: endTime || undefined,
-            deadlineTime: deadlineTime || undefined,
-            rewards: rewards.length > 0 ? rewards : undefined,
-            supervisor: enableSupervisor ? {
-                enabled: true,
-                name: supervisorName,
-                contact: supervisorContact,
-                method: supervisorMethod,
-                notifyOnCheckIn,
-                notifyOnOverdue
-            } : undefined,
-        } as Goal);
-        navigate('/');
+    const isEdit = !!goalId;
+    if (confirm(isEdit ? `确定保存对"${name}"的修改吗？` : `确定创建目标"${name}"吗？`)) {
+        try {
+            await setGoal({
+                id: goalId || 'goal-' + Date.now(),
+                name,
+                duration: durationNum,
+                category,
+                frequency,
+                intervalDays: frequency === 'custom' ? parseInt(intervalDays) : undefined,
+                templateId: 'custom',
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+                startTime: startTime || undefined,
+                endTime: endTime || undefined,
+                timeRestriction: {
+                    enabled: timeRestrictionEnabled
+                },
+                deadlineTime: deadlineTime || undefined,
+                rewards: rewards.length > 0 ? rewards : undefined,
+                supervisor: enableSupervisor ? {
+                    enabled: true,
+                    name: supervisorName,
+                    contact: supervisorContact,
+                    method: supervisorMethod,
+                    notifyOnCheckIn,
+                    notifyOnOverdue
+                } : undefined,
+            } as Goal);
+            navigate('/');
+        } catch (e: any) {
+            console.error('Save goal error:', e);
+            alert(e.message || '保存失败，请稍后重试');
+        }
     }
   };
 
@@ -125,19 +171,13 @@ export default function GoalCustomPage() {
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-full">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold">创建自定义目标</h1>
+        <h1 className="text-xl font-bold">{goalId ? '编辑目标' : '创建自定义目标'}</h1>
       </div>
 
       <div className="space-y-6">
         <div>
           <div className="flex justify-between items-center mb-2">
             <label className="block text-sm font-medium text-gray-700">目标分类</label>
-            <button 
-                onClick={() => setIsAddingCategory(true)}
-                className="text-xs text-indigo-600 flex items-center gap-1"
-            >
-                <Plus size={14} /> 自定义分类
-            </button>
           </div>
           
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -151,7 +191,7 @@ export default function GoalCustomPage() {
                         : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                 >
-                    <span>{cat.icon}</span>
+                    <CategoryIcon icon={cat.icon} />
                     <span>{cat.name}</span>
                 </button>
                 {cat.isCustom && (
@@ -169,26 +209,7 @@ export default function GoalCustomPage() {
             ))}
           </div>
           
-          {isAddingCategory && (
-            <div className="mt-2 p-3 bg-white rounded-xl border border-indigo-100 animate-in slide-in-from-top-2">
-                <div className="flex gap-2">
-                    <input 
-                        value={newCategoryIcon}
-                        onChange={(e) => setNewCategoryIcon(e.target.value)}
-                        className="w-10 p-2 border rounded-lg text-center"
-                        placeholder="图标"
-                    />
-                    <input 
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        className="flex-1 p-2 border rounded-lg"
-                        placeholder="分类名称"
-                    />
-                    <button onClick={handleAddCategory} className="bg-indigo-600 text-white px-3 rounded-lg text-sm">添加</button>
-                    <button onClick={() => setIsAddingCategory(false)} className="text-gray-400 px-2">取消</button>
-                </div>
-            </div>
-          )}
+          
         </div>
 
         <div>
@@ -254,9 +275,11 @@ export default function GoalCustomPage() {
         </div>
 
         <div className="border-t pt-4">
-            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar size={18} /> 时间设置 (可选)
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                    <Calendar size={18} /> 时间设置 (可选)
+                </h3>
+            </div>
             
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
@@ -279,31 +302,54 @@ export default function GoalCustomPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label className="block text-xs text-gray-500 mb-1">每日执行开始时间</label>
-                    <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
-                        <Clock size={14} className="text-gray-400" />
-                        <input 
-                            type="time" 
-                            value={startTime}
-                            onChange={(e) => setStartTime(e.target.value)}
-                            className="w-full text-sm outline-none"
-                        />
-                    </div>
+            <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-900">开启时间段打卡限制</label>
+                    <button 
+                        onClick={() => setTimeRestrictionEnabled(!timeRestrictionEnabled)}
+                        className={`w-10 h-5 rounded-full transition-colors relative ${
+                            timeRestrictionEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+                        }`}
+                    >
+                        <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all shadow-sm ${
+                            timeRestrictionEnabled ? 'left-6' : 'left-1'
+                        }`} />
+                    </button>
                 </div>
-                <div>
-                    <label className="block text-xs text-gray-500 mb-1">每日执行结束时间</label>
-                    <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
-                        <Clock size={14} className="text-gray-400" />
-                        <input 
-                            type="time" 
-                            value={endTime}
-                            onChange={(e) => setEndTime(e.target.value)}
-                            className="w-full text-sm outline-none"
-                        />
+                
+                {timeRestrictionEnabled && (
+                    <div className="animate-in fade-in slide-in-from-top-2">
+                        <p className="text-xs text-gray-400 mb-3 bg-gray-50 p-2 rounded-lg">
+                            开启后，您只能在设置的时间段内打卡。
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">打卡开始时间</label>
+                                <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
+                                    <Clock size={14} className="text-gray-400" />
+                                    <input 
+                                        type="time" 
+                                        value={startTime}
+                                        onChange={(e) => setStartTime(e.target.value)}
+                                        className="w-full text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">打卡结束时间</label>
+                                <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
+                                    <Clock size={14} className="text-gray-400" />
+                                    <input 
+                                        type="time" 
+                                        value={endTime}
+                                        onChange={(e) => setEndTime(e.target.value)}
+                                        className="w-full text-sm outline-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
             
             <div className="mb-4">
@@ -411,9 +457,10 @@ export default function GoalCustomPage() {
                             <span className="text-2xl">{reward.icon}</span>
                             <div>
                                 <p className="font-medium text-gray-900">{reward.name}</p>
-                                <p className="text-xs text-gray-500">
-                                    {reward.type === 'cumulative' ? '累计' : '连续'}打卡 {reward.days} 天
-                                </p>
+                                <div className="text-xs text-gray-500 flex flex-col">
+                                    {reward.consecutiveDays && <span>连续打卡 {reward.consecutiveDays} 天</span>}
+                                    {reward.cumulativeDays && <span>累计打卡 {reward.cumulativeDays} 天</span>}
+                                </div>
                             </div>
                         </div>
                         <button onClick={() => removeReward(reward.id)} className="text-gray-400 hover:text-red-500">
@@ -421,43 +468,45 @@ export default function GoalCustomPage() {
                         </button>
                     </div>
                 ))}
-                
+
                 {rewards.length === 0 && !isAddingReward && (
                     <p className="text-center text-sm text-gray-400 py-4">
-                        给自己设个小奖励吧，更有动力哦～
+                        给自己设置一些奖励吧，更有动力！
                     </p>
                 )}
 
                 {isAddingReward && (
                     <div className="p-4 bg-white rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
-                        <div className="flex gap-2 mb-3 p-1 bg-gray-100 rounded-lg">
-                            <button
-                                onClick={() => setNewRewardType('consecutive')}
-                                className={`flex-1 py-1.5 text-xs rounded-md transition-all ${
-                                    newRewardType === 'consecutive' ? 'bg-white text-indigo-600 shadow-sm font-medium' : 'text-gray-500'
-                                }`}
-                            >
-                                连续打卡
-                            </button>
-                            <button
-                                onClick={() => setNewRewardType('cumulative')}
-                                className={`flex-1 py-1.5 text-xs rounded-md transition-all ${
-                                    newRewardType === 'cumulative' ? 'bg-white text-indigo-600 shadow-sm font-medium' : 'text-gray-500'
-                                }`}
-                            >
-                                累计打卡
-                            </button>
+                        <p className="text-xs text-gray-500 mb-2">设置奖励条件 (可多选)</p>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label className="block text-[10px] text-gray-400 mb-1">连续打卡</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="number"
+                                        value={newRewardConsecutiveDays}
+                                        onChange={e => setNewRewardConsecutiveDays(e.target.value)}
+                                        className="w-full p-2 border rounded-lg text-sm"
+                                        placeholder="天数"
+                                    />
+                                    <span className="text-sm text-gray-500">天</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] text-gray-400 mb-1">累计打卡</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="number"
+                                        value={newRewardCumulativeDays}
+                                        onChange={e => setNewRewardCumulativeDays(e.target.value)}
+                                        className="w-full p-2 border rounded-lg text-sm"
+                                        placeholder="天数"
+                                    />
+                                    <span className="text-sm text-gray-500">天</span>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex gap-2 mb-3">
-                            <input 
-                                type="number"
-                                value={newRewardDays}
-                                onChange={e => setNewRewardDays(e.target.value)}
-                                className="w-20 p-2 border rounded-lg text-sm"
-                                placeholder="天数"
-                            />
-                            <span className="self-center text-sm text-gray-500">天</span>
-                        </div>
+
                         <div className="flex gap-2 mb-3">
                             <input 
                                 value={newRewardIcon}
@@ -469,7 +518,7 @@ export default function GoalCustomPage() {
                                 value={newRewardName}
                                 onChange={e => setNewRewardName(e.target.value)}
                                 className="flex-1 p-2 border rounded-lg text-sm"
-                                placeholder="奖励名称 (如: 奶茶一杯)"
+                                placeholder="奖励名称 (如: 看一场电影)"
                             />
                         </div>
                         <div className="flex justify-end gap-2">
@@ -485,7 +534,7 @@ export default function GoalCustomPage() {
           onClick={handleNext}
           className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-colors mt-8"
         >
-          创建目标
+          {goalId ? '保存修改' : '创建目标'}
         </button>
       </div>
     </div>

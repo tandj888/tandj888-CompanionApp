@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LittleCompanion</string>
+    <string name="title_activity_main">LittleCompanion</string>
+    <string name="package_name">com.tandj888.companion</string>
+    <string name="custom_url_scheme">com.tandj888.companion</string>
+</resources>

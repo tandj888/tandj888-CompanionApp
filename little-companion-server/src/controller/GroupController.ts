@@ -65,7 +65,8 @@ export class GroupController {
                  const groupMembers = members.map(m => ({
                      ...m.user, // User fields
                      ...m,      // Member fields (streak, etc.)
-                     // Avoid circular ref or duplicate fields if any
+                     id: m.user.id, // Ensure id is User ID
+                     memberId: m.id // Keep Member ID accessible
                  }));
                  return { ...g, members: groupMembers };
             }));

@@ -19,27 +19,47 @@ export default function GroupCreatePage() {
   const [endDate, setEndDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [timeRestrictionEnabled, setTimeRestrictionEnabled] = useState(false);
+
+  // Supervisor settings
+  const [enableSupervisor, setEnableSupervisor] = useState(false);
+  const [supervisorName, setSupervisorName] = useState('');
+  const [supervisorContact, setSupervisorContact] = useState('');
+  const [supervisorMethod, setSupervisorMethod] = useState<'app' | 'sms'>('app');
+  const [notifyOnCheckIn, setNotifyOnCheckIn] = useState(true);
+  const [notifyOnOverdue, setNotifyOnOverdue] = useState(true);
 
   // Rewards settings
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [isAddingReward, setIsAddingReward] = useState(false);
-  const [newRewardDays, setNewRewardDays] = useState('');
+  const [newRewardConsecutiveDays, setNewRewardConsecutiveDays] = useState('');
+  const [newRewardCumulativeDays, setNewRewardCumulativeDays] = useState('');
   const [newRewardName, setNewRewardName] = useState('');
   const [newRewardIcon, setNewRewardIcon] = useState('🎁');
 
   const handleAddReward = () => {
-    if (!newRewardDays || !newRewardName) return;
-    const days = parseInt(newRewardDays);
-    if (isNaN(days) || days <= 0) return;
+    if (!newRewardName) {
+        alert('请输入奖励名称');
+        return;
+    }
+    const consDays = parseInt(newRewardConsecutiveDays);
+    const cumDays = parseInt(newRewardCumulativeDays);
+    
+    if ((isNaN(consDays) || consDays <= 0) && (isNaN(cumDays) || cumDays <= 0)) {
+        alert('请至少设置一种打卡天数要求');
+        return;
+    }
     
     setRewards([...rewards, {
       id: 'reward-' + Date.now(),
-      days,
+      consecutiveDays: !isNaN(consDays) && consDays > 0 ? consDays : undefined,
+      cumulativeDays: !isNaN(cumDays) && cumDays > 0 ? cumDays : undefined,
       name: newRewardName,
-      icon: newRewardIcon
+      icon: newRewardIcon,
     }]);
     setIsAddingReward(false);
-    setNewRewardDays('');
+    setNewRewardConsecutiveDays('');
+    setNewRewardCumulativeDays('');
     setNewRewardName('');
   };
 
@@ -47,7 +67,7 @@ export default function GroupCreatePage() {
     setRewards(rewards.filter(r => r.id !== id));
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!name) {
       alert('请输入陪团名称（1-8字）');
       return;
@@ -66,23 +86,41 @@ export default function GroupCreatePage() {
         return;
     }
     
-    if (!user) return;
+    if (!user) {
+        alert('请先登录');
+        return;
+    }
 
-    createGroup({
-        name,
-        description,
-        creator: user,
-        maxMembers: max,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        startTime: startTime || undefined,
-        endTime: endTime || undefined,
-        rewards: rewards.length > 0 ? rewards : undefined
-    });
-    
-    // Show success modal then navigate (simplified)
-    alert('建团成功！');
-    navigate('/group');
+    try {
+        await createGroup({
+            name,
+            description,
+            creator: user,
+            maxMembers: max,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
+            startTime: startTime || undefined,
+            endTime: endTime || undefined,
+            timeRestriction: {
+                enabled: timeRestrictionEnabled
+            },
+            rewards: rewards.length > 0 ? rewards : undefined,
+            supervisor: enableSupervisor ? {
+                enabled: true,
+                name: supervisorName,
+                contact: supervisorContact,
+                method: supervisorMethod,
+                notifyOnCheckIn,
+                notifyOnOverdue
+            } : undefined
+        });
+        
+        alert('建团成功！');
+        navigate('/group');
+    } catch (e: any) {
+        console.error('Create group error:', e);
+        alert(e.message || '创建失败，请稍后重试');
+    }
   };
 
   return (
@@ -137,9 +175,11 @@ export default function GroupCreatePage() {
         </div>
 
         <div className="border-t pt-4">
-            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Calendar size={18} /> 时间设置 (可选)
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                    <Calendar size={18} /> 时间设置 (可选)
+                </h3>
+            </div>
             
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
@@ -162,32 +202,115 @@ export default function GroupCreatePage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label className="block text-xs text-gray-500 mb-1">每日开始提醒</label>
-                    <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
-                        <Clock size={14} className="text-gray-400" />
-                        <input 
-                            type="time" 
-                            value={startTime}
-                            onChange={(e) => setStartTime(e.target.value)}
-                            className="w-full text-sm outline-none"
-                        />
+            <div className="mb-4">
+                 <div className="flex items-center justify-between mb-2">
+                     <label className="text-sm font-medium text-gray-900">开启时间段打卡限制</label>
+                     <button 
+                         onClick={() => setTimeRestrictionEnabled(!timeRestrictionEnabled)}
+                         className={`w-10 h-5 rounded-full transition-colors relative ${
+                             timeRestrictionEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+                         }`}
+                     >
+                         <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-all shadow-sm ${
+                             timeRestrictionEnabled ? 'left-6' : 'left-1'
+                         }`} />
+                     </button>
+                 </div>
+                 <p className="text-xs text-gray-400 mb-3 bg-gray-50 p-2 rounded-lg">
+                     {timeRestrictionEnabled 
+                         ? "开启后，您只能在下方设置的“打卡开始时间”到“打卡结束时间”范围内进行打卡，其他时间将无法打卡。" 
+                         : "关闭后，您可以随时打卡，下方的开始/结束时间仅作为参考提醒。"}
+                </p>
+
+                {timeRestrictionEnabled && (
+                    <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">打卡开始时间</label>
+                            <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
+                                <Clock size={14} className="text-gray-400" />
+                                <input 
+                                    type="time" 
+                                    value={startTime}
+                                    onChange={(e) => setStartTime(e.target.value)}
+                                    className="w-full text-sm outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">打卡结束时间</label>
+                            <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
+                                <Clock size={14} className="text-gray-400" />
+                                <input 
+                                    type="time" 
+                                    value={endTime}
+                                    onChange={(e) => setEndTime(e.target.value)}
+                                    className="w-full text-sm outline-none"
+                                />
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div>
-                    <label className="block text-xs text-gray-500 mb-1">每日结束提醒</label>
-                    <div className="flex items-center gap-2 bg-white border rounded-lg p-2">
-                        <Clock size={14} className="text-gray-400" />
-                        <input 
-                            type="time" 
-                            value={endTime}
-                            onChange={(e) => setEndTime(e.target.value)}
-                            className="w-full text-sm outline-none"
-                        />
-                    </div>
-                </div>
+                )}
             </div>
+        </div>
+
+        <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                    <span className="text-lg">👀</span> 监督人设置
+                </h3>
+                <button 
+                    onClick={() => setEnableSupervisor(!enableSupervisor)}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${
+                        enableSupervisor ? 'bg-indigo-600' : 'bg-gray-200'
+                    }`}
+                >
+                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all shadow-sm ${
+                        enableSupervisor ? 'left-7' : 'left-1'
+                    }`} />
+                </button>
+            </div>
+            
+            {enableSupervisor && (
+                <div className="bg-white p-4 rounded-xl border border-gray-100 space-y-4 animate-in slide-in-from-top-2">
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">监督人称呼</label>
+                        <input 
+                            value={supervisorName}
+                            onChange={(e) => setSupervisorName(e.target.value)}
+                            placeholder="如：妈妈、教练"
+                            className="w-full p-2 border rounded-lg text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">联系方式 (电话/微信)</label>
+                        <input 
+                            value={supervisorContact}
+                            onChange={(e) => setSupervisorContact(e.target.value)}
+                            placeholder="输入号码"
+                            className="w-full p-2 border rounded-lg text-sm"
+                        />
+                    </div>
+                    
+                    <div className="flex gap-2 text-sm">
+                         <label className="flex items-center gap-2">
+                             <input 
+                                 type="checkbox" 
+                                 checked={notifyOnCheckIn}
+                                 onChange={(e) => setNotifyOnCheckIn(e.target.checked)}
+                             />
+                             打卡通知TA
+                         </label>
+                         <label className="flex items-center gap-2">
+                             <input 
+                                 type="checkbox" 
+                                 checked={notifyOnOverdue}
+                                 onChange={(e) => setNotifyOnOverdue(e.target.checked)}
+                             />
+                             逾期通知TA
+                         </label>
+                    </div>
+                </div>
+            )}
         </div>
 
         <div className="border-t pt-4">
@@ -210,7 +333,10 @@ export default function GroupCreatePage() {
                              <span className="text-2xl">{reward.icon}</span>
                              <div>
                                  <p className="font-medium text-gray-900">{reward.name}</p>
-                                 <p className="text-xs text-gray-500">连续打卡 {reward.days} 天</p>
+                                 <div className="text-xs text-gray-500 flex flex-col">
+                                     {reward.consecutiveDays && <span>连续打卡 {reward.consecutiveDays} 天</span>}
+                                     {reward.cumulativeDays && <span>累计打卡 {reward.cumulativeDays} 天</span>}
+                                 </div>
                              </div>
                          </div>
                          <button onClick={() => removeReward(reward.id)} className="text-gray-400 hover:text-red-500">
@@ -227,16 +353,36 @@ export default function GroupCreatePage() {
  
                  {isAddingReward && (
                      <div className="p-4 bg-white rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
-                         <div className="flex gap-2 mb-3">
-                             <input 
-                                 type="number"
-                                 value={newRewardDays}
-                                 onChange={e => setNewRewardDays(e.target.value)}
-                                 className="w-20 p-2 border rounded-lg text-sm"
-                                 placeholder="天数"
-                             />
-                             <span className="self-center text-sm text-gray-500">天</span>
-                         </div>
+                        <p className="text-xs text-gray-500 mb-2">设置奖励条件 (可多选)</p>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                                <label className="block text-[10px] text-gray-400 mb-1">连续打卡</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="number"
+                                        value={newRewardConsecutiveDays}
+                                        onChange={e => setNewRewardConsecutiveDays(e.target.value)}
+                                        className="w-full p-2 border rounded-lg text-sm"
+                                        placeholder="天数"
+                                    />
+                                    <span className="text-sm text-gray-500">天</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] text-gray-400 mb-1">累计打卡</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="number"
+                                        value={newRewardCumulativeDays}
+                                        onChange={e => setNewRewardCumulativeDays(e.target.value)}
+                                        className="w-full p-2 border rounded-lg text-sm"
+                                        placeholder="天数"
+                                    />
+                                    <span className="text-sm text-gray-500">天</span>
+                                </div>
+                            </div>
+                        </div>
+                         
                          <div className="flex gap-2 mb-3">
                              <input 
                                  value={newRewardIcon}

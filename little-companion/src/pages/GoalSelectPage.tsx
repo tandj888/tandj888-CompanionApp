@@ -8,14 +8,19 @@ export default function GoalSelectPage() {
   const setGoal = useGoalStore((state) => state.setGoal);
   const navigate = useNavigate();
 
-  const handleSelect = (template: Omit<Goal, 'id'>) => {
+  const handleSelect = async (template: Omit<Goal, 'id'>) => {
     // Simple confirmation
     if (confirm(`确定要选择目标"${template.name}"吗？`)) {
-      setGoal({
-        ...template,
-        id: 'goal-' + Date.now(),
-      } as Goal);
-      navigate('/');
+      try {
+          await setGoal({
+            ...template,
+            id: 'goal-' + Date.now(),
+          } as Goal);
+          navigate('/');
+      } catch (e: any) {
+          console.error('Create goal error:', e);
+          alert(e.message || '创建失败，请检查网络');
+      }
     }
   };
 

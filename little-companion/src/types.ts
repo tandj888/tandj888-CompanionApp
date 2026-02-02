@@ -28,6 +28,12 @@ export interface User {
   };
 }
 
+export interface GroupMember extends User {
+  hasCheckedInToday: boolean;
+  streak: number;
+  totalCheckIns?: number;
+}
+
 export interface Badge {
   id: string;
   name: string;
@@ -46,10 +52,46 @@ export interface Category {
 
 export interface Reward {
   id: string;
-  days: number;
   name: string;
   icon: string;
-  type: 'consecutive' | 'cumulative';
+  consecutiveDays?: number;
+  cumulativeDays?: number;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description: string;
+  leaderId: string;
+  members: GroupMember[];
+  createTime: number;
+  inviteCode: string;
+  inviteExpires: number;
+  maxMembers: number;
+  status: 'active' | 'dissolved';
+  dissolvedAt?: number;
+  
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  
+  // New: Time Restriction
+  timeRestriction?: {
+    enabled: boolean;
+  };
+
+  rewards?: Reward[];
+  
+  // New: Supervisor
+  supervisor?: {
+    enabled: boolean;
+    name: string;
+    contact: string;
+    method: 'sms' | 'app';
+    notifyOnCheckIn: boolean;
+    notifyOnOverdue: boolean;
+  };
 }
 
 export interface Goal {
@@ -68,6 +110,11 @@ export interface Goal {
   startTime?: string; // HH:mm (Start of execution window)
   endTime?: string; // HH:mm (End of execution window)
   
+  // Time Restriction (New)
+  timeRestriction?: {
+    enabled: boolean;
+  };
+
   // Notification / Deadline
   deadlineTime?: string; // HH:mm (If not checked in by this time, notify)
   lastDeadlineNotified?: number; // Timestamp
@@ -104,4 +151,26 @@ export interface CheckIn {
   likes: string[]; // User IDs
   anonymousLike?: string; // Random encouragement message
   timestamp: number;
+}
+
+export interface Gift {
+  id: string;
+  name: string;
+  image: string;
+  cost?: number;
+  requiredDays?: number;
+  description: string;
+  stock: number;
+  type: 'star' | 'streak';
+  category: 'virtual' | 'physical' | 'coupon';
+}
+
+export interface RedemptionRecord {
+  id: string;
+  userId: string;
+  giftId: string;
+  giftName: string;
+  cost: number;
+  timestamp: number;
+  status: 'pending' | 'completed' | 'rejected';
 }

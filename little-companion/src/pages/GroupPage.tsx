@@ -7,9 +7,14 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
 export default function GroupPage() {
-  const { groups, joinGroup, leaveGroup, dissolveGroup, kickMember, refreshInviteCode, updateGroup, simulateMemberJoin, getGroupShareToken, syncUserCheckIn } = useGroupStore();
+  const { groups, joinGroup, leaveGroup, dissolveGroup, kickMember, refreshInviteCode, updateGroup, simulateMemberJoin, getGroupShareToken, syncUserCheckIn, syncWithBackend } = useGroupStore();
   const { user } = useUserStore();
   const navigate = useNavigate();
+  
+  // Sync with backend on mount to ensure list is up to date
+  useEffect(() => {
+      syncWithBackend();
+  }, []);
   
   // View State
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -69,17 +74,27 @@ export default function GroupPage() {
     setTimeout(() => setTokenCopied(false), 2000);
   };
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     if (!joinCode.trim()) return;
     if (!user) return;
-    const success = joinGroup(joinCode.trim(), user);
-    if (!success) {
-        alert('加入失败：邀请码无效、已在陪团中或人数已满');
-    } else {
-        alert('加入成功！');
-        setJoinCode('');
-        // Find the group we just joined to switch to it? 
-        // For now just stay on list to see it appear.
+    
+    // Show loading state could be nice, but for now just await
+    try {
+        const result = await joinGroup(joinCode.trim(), user);
+        
+        if (result.success) {
+             if (result.code === 'already_joined') {
+                 alert(result.message || '你已经在该陪团中了');
+             } else {
+                 alert('加入成功！');
+             }
+             setJoinCode('');
+        } else {
+             alert(`加入失败：${result.message || '未知错误'}`);
+        }
+    } catch (error) {
+        console.error('Join error:', error);
+        alert('加入遇到问题，请重试');
     }
   };
 
@@ -129,19 +144,7 @@ export default function GroupPage() {
 
   const simulateCheckIn = (memberId: string, memberName: string) => {
     if (!currentGroup) return;
-    syncUserCheckIn(currentGroup.id, memberId, true); // Note: Need to update store to accept groupId for sync?
-    // Wait, syncUserCheckIn in store def from previous read:
-    // syncUserCheckIn: (userId: string, hasCheckedIn: boolean) => void;
-    // It updates ALL groups for that user. But wait, check-in should probably be per-group or global?
-    // In this app, check-in is global (User CheckInStore), and GroupStore just syncs/mirrors it.
-    // So calling syncUserCheckIn updates the group store's copy.
-    // Actually, looking at the store code: 
-    // syncUserCheckIn: (userId, hasCheckedIn) => set(state => ({ groups: state.groups.map(...) }))
-    // It updates the user in ALL groups. This is correct for "Personal Goal" driving "Group Status".
-    
-    // BUT, for simulation, we might want to just update this specific group member visually?
-    // The store function updates all groups. That's fine.
-    syncUserCheckIn(memberId, true);
+    syncUserCheckIn(currentGroup.id, memberId, true);
     setNotification(`${memberName} 完成了今日打卡！`);
     setTimeout(() => setNotification(null), 3000);
   };
@@ -151,7 +154,17 @@ export default function GroupPage() {
     return (
       <div className="p-6 pt-12 min-h-screen pb-24">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">我的小陪团</h1>
+          <div className="flex items-center gap-2">
+            {showHistory && (
+              <button 
+                onClick={() => setShowHistory(false)} 
+                className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
+            <h1 className="text-2xl font-bold">我的小陪团</h1>
+          </div>
           <button 
              onClick={() => setShowHistory(!showHistory)}
              className={`p-2 rounded-full transition-colors ${showHistory ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:bg-gray-100'}`}
@@ -187,7 +200,7 @@ export default function GroupPage() {
                     </button>
                 </div>
                 <p className="text-xs text-gray-400 mt-2 px-1">
-                    * 本地测试请直接输入6位邀请码；跨设备/浏览器测试请向团长索要“跨设备口令”
+                    * 6位邀请码仅限本机或同服务器测试；跨设备/浏览器请向团长索要“跨设备口令”
                 </p>
             </div>
         )}
@@ -236,8 +249,8 @@ export default function GroupPage() {
                             </div>
                             <span>
                                 {g.dissolvedAt 
-                                    ? `解散于 ${format(g.dissolvedAt, 'yyyy-MM-dd')}` 
-                                    : `创建于 ${format(g.createTime, 'yyyy-MM-dd')}`
+                                    ? `解散于 ${g.dissolvedAt ? format(new Date(Number(g.dissolvedAt)), 'yyyy-MM-dd') : '未知'}` 
+                                    : `创建于 ${g.createTime ? format(new Date(Number(g.createTime)), 'yyyy-MM-dd') : '未知'}`
                                 }
                             </span>
                         </div>
@@ -320,19 +333,23 @@ export default function GroupPage() {
         {currentGroup.rewards && currentGroup.rewards.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
-                    <Gift size={12} /> 连续打卡奖励
+                    <Gift size={12} /> 打卡奖励
                 </p>
                 <div className="flex gap-2 overflow-x-auto pb-2">
                     {currentGroup.rewards.map(reward => {
                         // Find current user's streak in this group
                         const myMemberInfo = currentGroup.members.find(m => m.id === user?.id);
                         const myStreak = myMemberInfo?.streak || 0;
-                        const isUnlocked = myStreak >= reward.days;
+                        const myTotal = myMemberInfo?.totalCheckIns || myStreak; // Fallback to streak if total not available
+                        
+                        const isUnlocked = 
+                            (reward.consecutiveDays && myStreak >= reward.consecutiveDays) ||
+                            (reward.cumulativeDays && myTotal >= reward.cumulativeDays);
                         
                         return (
                             <div 
                                 key={reward.id} 
-                                className={`flex-shrink-0 border px-3 py-2 rounded-xl flex items-center gap-2 min-w-[100px] transition-colors ${
+                                className={`flex-shrink-0 border px-3 py-2 rounded-xl flex items-center gap-2 min-w-[120px] transition-colors ${
                                     isUnlocked 
                                     ? 'bg-yellow-50 border-yellow-200' 
                                     : 'bg-pink-50 border-pink-100'
@@ -343,9 +360,16 @@ export default function GroupPage() {
                                     <p className={`text-xs font-bold ${isUnlocked ? 'text-yellow-700' : 'text-pink-600'}`}>
                                         {reward.name}
                                     </p>
-                                    <p className={`text-[10px] ${isUnlocked ? 'text-yellow-600' : 'text-pink-400'}`}>
-                                        {isUnlocked ? '已达成' : `${reward.days}天`}
-                                    </p>
+                                    <div className={`text-[10px] flex flex-col ${isUnlocked ? 'text-yellow-600' : 'text-pink-400'}`}>
+                                        {isUnlocked ? (
+                                            <span>已达成</span>
+                                        ) : (
+                                            <>
+                                                {reward.consecutiveDays && <span>连续 {myStreak}/{reward.consecutiveDays}</span>}
+                                                {reward.cumulativeDays && <span>累计 {myTotal}/{reward.cumulativeDays}</span>}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );

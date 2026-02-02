@@ -58,7 +58,7 @@ export default function GiftShopPage() {
 
                     {isUnlocked ? (
                         <button 
-                            onClick={() => handleRedeem(gift.name)}
+                            onClick={() => handleRedeem(gift.id, gift.name)}
                             className="w-full bg-indigo-600 text-white text-xs py-2 rounded-lg font-medium shadow-sm hover:bg-indigo-700 transition-colors flex items-center justify-center gap-1"
                         >
                             <CheckCircle size={12} /> 立即兑换

@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from '../types';
 import { userApi } from '../api/userApi';
+import { useGoalStore } from './goalStore';
+import { useCheckInStore } from './checkInStore';
+import { useGroupStore } from './groupStore';
+import { useMicroRecordStore } from './microRecordStore';
+import { useGiftStore } from './giftStore';
 
 interface UserState {
   user: User | null;
@@ -30,7 +35,9 @@ export const useUserStore = create<UserState>()(
                     await Promise.all([
                         useGoalStore.getState().syncWithBackend(),
                         useCheckInStore.getState().syncWithBackend(),
-                        useGroupStore.getState().syncWithBackend()
+                        useGroupStore.getState().syncWithBackend(),
+                        useMicroRecordStore.getState().fetchRecords(),
+                        useGiftStore.getState().syncWithBackend()
                     ]);
                 } catch (error) {
                     console.error("Error syncing data after login", error);
@@ -41,7 +48,7 @@ export const useUserStore = create<UserState>()(
                  // But strictly speaking, we should force API usage.
                  // Let's assume for now, if "password" is provided, we call API.
                  console.warn("Login called without password, falling back to local mock state if applicable");
-                 set((state) => ({
+                 set({
                     user: {
                       id: 'user-' + Date.now(),
                       nickname: '微信用户',
@@ -68,10 +75,10 @@ export const useUserStore = create<UserState>()(
                       ...userInfo,
                     } as User,
                     isLoggedIn: true,
-                  }));
+                  });
             } else {
                  // Original Mock Logic
-                 set((state) => ({
+                 set({
                     user: {
                       id: 'user-' + Date.now(),
                       nickname: '微信用户',
@@ -98,7 +105,7 @@ export const useUserStore = create<UserState>()(
                       ...userInfo,
                     } as User,
                     isLoggedIn: true,
-                  }));
+                  });
             }
         } catch (error) {
             console.error("Login failed", error);

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGiftStore } from '../stores/giftStore';
 import { useCheckInStore } from '../stores/checkInStore';
 import { useUserStore } from '../stores/userStore';
-import { ArrowLeft, Lock, CheckCircle, Award, Star, Clock, ShoppingBag, History } from 'lucide-react';
+import { ArrowLeft, Award, Star, Clock, ShoppingBag, History } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function RedemptionCenterPage() {
@@ -22,10 +22,10 @@ export default function RedemptionCenterPage() {
     setRedeemModal({ isOpen: true, giftId });
   };
 
-  const confirmRedeem = () => {
+  const confirmRedeem = async () => {
     if (!user || !redeemModal.giftId) return;
     
-    const result = redeemGift(user.id, redeemModal.giftId);
+    const result = await redeemGift(user.id, redeemModal.giftId);
     
     if (result.success) {
       setRedeemModal({ isOpen: false, giftId: null });
