@@ -49,6 +49,7 @@ export interface Reward {
   days: number;
   name: string;
   icon: string;
+  type: 'consecutive' | 'cumulative';
 }
 
 export interface Goal {
@@ -100,66 +101,7 @@ export interface CheckIn {
   status: 'completed' | 'missed';
   record?: MicroRecord;
   starsEarned: number;
-  likes: string[]; // User IDs who liked
-  anonymousLike?: string; // Content of anonymous like
+  likes: string[]; // User IDs
+  anonymousLike?: string; // Random encouragement message
   timestamp: number;
-}
-
-export interface GroupMember extends User {
-  hasCheckedInToday: boolean;
-  streak: number;
-  redeemedRewards?: string[]; // IDs of rewards claimed
-}
-
-export interface Group {
-  id: string;
-  name: string;
-  description: string;
-  leaderId: string;
-  members: GroupMember[];
-  createTime: number;
-  inviteCode: string;
-  inviteExpires: number;
-  
-  // New features
-  maxMembers: number;
-  status: 'active' | 'dissolved';
-  dissolvedAt?: number;
-  
-  // Goal-like settings
-  startDate?: string;
-  endDate?: string;
-  startTime?: string;
-  endTime?: string;
-  rewards?: Reward[];
-}
-
-export interface Gift {
-  id: string;
-  name: string;
-  image: string;
-  requiredDays?: number; // For streak rewards
-  cost?: number;         // For star rewards
-  type: 'streak' | 'star';
-  description: string;
-  stock?: number;
-  category?: 'virtual' | 'physical' | 'coupon';
-}
-
-export interface RedemptionRecord {
-  id: string;
-  userId: string;
-  giftId: string;
-  giftName: string;
-  cost: number;
-  timestamp: number;
-  status: 'pending' | 'completed';
-}
-
-export interface Notification {
-  id: string;
-  type: 'like' | 'reminder' | 'system' | 'invite';
-  content: string;
-  timestamp: number;
-  read: boolean;
 }

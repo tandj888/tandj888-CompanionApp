@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CheckIn, MicroRecord } from '../types';
-import { format } from 'date-fns';
+import { format, subDays, parseISO, isSameDay } from 'date-fns';
 import { useGoalStore } from './goalStore';
 import { useUserStore } from './userStore';
 import { checkInApi } from '../api/checkInApi';
@@ -12,6 +12,7 @@ interface CheckInState {
   getTodayCheckIn: (goalId: string) => CheckIn | undefined;
   addRecordToToday: (goalId: string, text: string, image?: string) => Promise<void>;
   getStreak: (goalId: string) => number;
+  getCumulativeCheckIns: (goalId: string) => number;
   syncWithBackend: () => Promise<void>;
 }
 
@@ -107,8 +108,47 @@ export const useCheckInStore = create<CheckInState>()(
       },
       getStreak: (goalId) => {
         const checkIns = get().checkIns.filter(c => c.goalId === goalId);
-        // Simple count for now.
-        return checkIns.length; 
+        if (checkIns.length === 0) return 0;
+
+        // Sort by date descending
+        const sortedCheckIns = [...checkIns].sort((a, b) => b.timestamp - a.timestamp);
+        
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
+        const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+        
+        // Check if the latest check-in is today or yesterday
+        // If the latest check-in is older than yesterday, streak is 0 (broken)
+        // Unless... well, for now let's assume strict daily streak.
+        // TODO: Handle frequency (e.g. alternate days). For now assuming daily.
+        
+        const latest = sortedCheckIns[0];
+        if (latest.date !== todayStr && latest.date !== yesterdayStr) {
+            return 0;
+        }
+
+        let streak = 0;
+        let currentDate = new Date();
+        
+        // If not checked in today yet, start checking from yesterday
+        if (latest.date !== todayStr) {
+            currentDate = subDays(currentDate, 1);
+        }
+
+        for (const checkIn of sortedCheckIns) {
+            if (checkIn.date === format(currentDate, 'yyyy-MM-dd')) {
+                streak++;
+                currentDate = subDays(currentDate, 1);
+            } else {
+                // Gap detected
+                break;
+            }
+        }
+        
+        return streak;
+      },
+      getCumulativeCheckIns: (goalId) => {
+        const checkIns = get().checkIns.filter(c => c.goalId === goalId);
+        return checkIns.length;
       },
       syncWithBackend: async () => {
           const user = useUserStore.getState().user;

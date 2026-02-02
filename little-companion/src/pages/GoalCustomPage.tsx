@@ -39,6 +39,7 @@ export default function GoalCustomPage() {
   const [newRewardDays, setNewRewardDays] = useState('');
   const [newRewardName, setNewRewardName] = useState('');
   const [newRewardIcon, setNewRewardIcon] = useState('🎁');
+  const [newRewardType, setNewRewardType] = useState<'consecutive' | 'cumulative'>('consecutive');
 
   const handleAddReward = () => {
     if (!newRewardDays || !newRewardName) return;
@@ -49,11 +50,13 @@ export default function GoalCustomPage() {
       id: 'reward-' + Date.now(),
       days,
       name: newRewardName,
-      icon: newRewardIcon
+      icon: newRewardIcon,
+      type: newRewardType
     }]);
     setIsAddingReward(false);
     setNewRewardDays('');
     setNewRewardName('');
+    setNewRewardType('consecutive');
   };
 
   const removeReward = (id: string) => {
@@ -391,7 +394,7 @@ export default function GoalCustomPage() {
         <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                    <Gift size={18} className="text-pink-500" /> 连续打卡奖励
+                    <Gift size={18} className="text-pink-500" /> 打卡奖励
                 </h3>
                 <button 
                     onClick={() => setIsAddingReward(true)}
@@ -408,7 +411,9 @@ export default function GoalCustomPage() {
                             <span className="text-2xl">{reward.icon}</span>
                             <div>
                                 <p className="font-medium text-gray-900">{reward.name}</p>
-                                <p className="text-xs text-gray-500">连续打卡 {reward.days} 天</p>
+                                <p className="text-xs text-gray-500">
+                                    {reward.type === 'cumulative' ? '累计' : '连续'}打卡 {reward.days} 天
+                                </p>
                             </div>
                         </div>
                         <button onClick={() => removeReward(reward.id)} className="text-gray-400 hover:text-red-500">
@@ -425,6 +430,24 @@ export default function GoalCustomPage() {
 
                 {isAddingReward && (
                     <div className="p-4 bg-white rounded-xl border border-indigo-100 shadow-sm animate-in slide-in-from-top-2">
+                        <div className="flex gap-2 mb-3 p-1 bg-gray-100 rounded-lg">
+                            <button
+                                onClick={() => setNewRewardType('consecutive')}
+                                className={`flex-1 py-1.5 text-xs rounded-md transition-all ${
+                                    newRewardType === 'consecutive' ? 'bg-white text-indigo-600 shadow-sm font-medium' : 'text-gray-500'
+                                }`}
+                            >
+                                连续打卡
+                            </button>
+                            <button
+                                onClick={() => setNewRewardType('cumulative')}
+                                className={`flex-1 py-1.5 text-xs rounded-md transition-all ${
+                                    newRewardType === 'cumulative' ? 'bg-white text-indigo-600 shadow-sm font-medium' : 'text-gray-500'
+                                }`}
+                            >
+                                累计打卡
+                            </button>
+                        </div>
                         <div className="flex gap-2 mb-3">
                             <input 
                                 type="number"

@@ -9,10 +9,11 @@ interface GoalCardProps {
 }
 
 export const GoalCard: React.FC<GoalCardProps> = ({ goal, onCheckIn }) => {
-  const { getTodayCheckIn, getStreak } = useCheckInStore();
+  const { getTodayCheckIn, getStreak, getCumulativeCheckIns } = useCheckInStore();
   const todayCheckIn = getTodayCheckIn(goal.id);
   const isCheckedIn = !!todayCheckIn;
   const streak = getStreak(goal.id);
+  const cumulative = getCumulativeCheckIns(goal.id);
 
   return (
     <div className="bg-white rounded-3xl p-6 shadow-sm mb-4 border border-gray-100">
@@ -26,20 +27,29 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onCheckIn }) => {
             每次耗时 {goal.duration} 分钟
           </p>
         </div>
-        <div className="text-center bg-gray-50 px-3 py-2 rounded-xl">
-          <p className="text-2xl font-bold text-indigo-600">{streak}</p>
-          <p className="text-xs text-gray-400">连续坚持</p>
+        <div className="flex gap-2">
+            <div className="text-center bg-gray-50 px-3 py-2 rounded-xl">
+            <p className="text-2xl font-bold text-indigo-600">{streak}</p>
+            <p className="text-xs text-gray-400">连续</p>
+            </div>
+            <div className="text-center bg-gray-50 px-3 py-2 rounded-xl">
+            <p className="text-2xl font-bold text-indigo-600">{cumulative}</p>
+            <p className="text-xs text-gray-400">累计</p>
+            </div>
         </div>
       </div>
 
       {goal.rewards && goal.rewards.length > 0 && (
         <div className="mb-6 pt-4 border-t border-gray-100">
           <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
-            <Gift size={12} /> 连续打卡奖励
+            <Gift size={12} /> 打卡奖励
           </p>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {goal.rewards.map(reward => {
-              const isUnlocked = streak >= reward.days;
+              const isCumulative = reward.type === 'cumulative';
+              const currentProgress = isCumulative ? cumulative : streak;
+              const isUnlocked = currentProgress >= reward.days;
+              
               return (
                 <div 
                   key={reward.id} 
@@ -55,7 +65,7 @@ export const GoalCard: React.FC<GoalCardProps> = ({ goal, onCheckIn }) => {
                       {reward.name}
                     </p>
                     <p className={`text-[10px] ${isUnlocked ? 'text-yellow-600' : 'text-pink-400'}`}>
-                      {isUnlocked ? '已达成' : `${reward.days}天`}
+                      {isUnlocked ? '已达成' : `${isCumulative ? '累计' : '连续'}${reward.days}天`}
                     </p>
                   </div>
                 </div>
