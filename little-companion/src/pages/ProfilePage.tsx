@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { useUserStore } from '../stores/userStore';
 import { useCheckInStore } from '../stores/checkInStore';
-import { Settings, ChevronRight, LogOut, Bell, Clock, User as UserIcon, Shield, Gift, Edit2, X } from 'lucide-react';
+import { useNotificationStore } from '../stores/notificationStore';
+import { Settings, ChevronRight, LogOut, Bell, Clock, User as UserIcon, Shield, Gift, Edit2, X, Heart, Bookmark } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function ProfilePage() {
   const { user, logout, updateUser } = useUserStore();
   const { checkIns, getStreak } = useCheckInStore();
+  const { notifications } = useNotificationStore();
   const navigate = useNavigate();
+
+  const unreadCount = notifications.filter(n => !n.read).length;
   
   const [showReminderSettings, setShowReminderSettings] = useState(false);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -135,6 +139,58 @@ export default function ProfilePage() {
       </div>
 
       <div className="space-y-3">
+        {/* Creator Center Entry */}
+        <button 
+          onClick={() => navigate('/creative-center')}
+          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 p-4 rounded-xl flex justify-between items-center text-white shadow-lg shadow-purple-200 mb-2"
+        >
+          <span className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-white/20 text-white">
+                <Edit2 size={20} />
+            </div>
+            <div className="text-left">
+                <p className="font-bold">我的创作中心</p>
+                <p className="text-xs opacity-80">查看作品、互动消息与数据</p>
+            </div>
+          </span>
+          <ChevronRight size={20} className="text-white/80" />
+        </button>
+
+        {/* My Favorites */}
+        <button 
+          onClick={() => navigate('/favorites')}
+          className="w-full bg-white p-4 rounded-xl flex justify-between items-center text-gray-700 shadow-sm"
+        >
+          <span className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-yellow-50 text-yellow-500">
+                <Bookmark size={20} />
+            </div>
+            <span>我的收藏</span>
+          </span>
+          <ChevronRight size={20} className="text-gray-300" />
+        </button>
+
+        <button 
+          onClick={() => navigate('/notifications')}
+          className="w-full bg-white p-4 rounded-xl flex justify-between items-center text-gray-700 shadow-sm"
+        >
+          <span className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-pink-50 text-pink-600 relative">
+                <Heart size={20} />
+                {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+            </div>
+            <span>互动消息</span>
+            {unreadCount > 0 && (
+                <span className="bg-red-50 text-red-500 text-xs px-2 py-0.5 rounded-full font-medium">
+                    {unreadCount}条未读
+                </span>
+            )}
+          </span>
+          <ChevronRight size={20} className="text-gray-300" />
+        </button>
+
         {/* Reminder Settings Button */}
         <button 
           onClick={() => setShowReminderSettings(true)}

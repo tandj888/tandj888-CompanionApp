@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useGroupStore } from '../stores/groupStore';
 import { useUserStore } from '../stores/userStore';
-import { Users, Plus, Heart, Copy, Check, ArrowRight, Settings, LogOut, Trash2, Edit2, Crown, Zap, Calendar, Gift, ChevronLeft, Clock, History } from 'lucide-react';
+import { useGoalStore } from '../stores/goalStore';
+import { Users, Plus, Heart, Copy, Check, ArrowRight, Settings, LogOut, Trash2, Edit2, Crown, Calendar, Gift, ChevronLeft, Clock, History, Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow, format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import { useCheckInStore } from '../stores/checkInStore';
+import { CategoryIcon } from '../components/CategoryIcon';
 
 export default function GroupPage() {
-  const { groups, joinGroup, leaveGroup, dissolveGroup, kickMember, refreshInviteCode, updateGroup, simulateMemberJoin, getGroupShareToken, syncUserCheckIn, syncWithBackend } = useGroupStore();
+  const { groups, joinGroup, leaveGroup, dissolveGroup, kickMember, refreshInviteCode, updateGroup, syncWithBackend, checkInGroup, likeMember, remindMember } = useGroupStore();
   const { user } = useUserStore();
+  const { goals, categories } = useGoalStore();
   const navigate = useNavigate();
+  // Removed useCheckInStore dependency for likes
   
   // Sync with backend on mount to ensure list is up to date
   useEffect(() => {
@@ -21,12 +26,10 @@ export default function GroupPage() {
   const [showHistory, setShowHistory] = useState(false);
   
   // Modal State
-  const [likedMembers, setLikedMembers] = useState<string[]>([]);
   const [showInvite, setShowInvite] = useState(false);
   const [showManage, setShowManage] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [tokenCopied, setTokenCopied] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
@@ -53,10 +56,39 @@ export default function GroupPage() {
   const maxStreak = currentGroup ? Math.max(...currentGroup.members.map(m => m.streak || 0)) : 0;
   const isDissolved = currentGroup?.status === 'dissolved';
 
-  const handleLike = (memberId: string) => {
-    if (likedMembers.includes(memberId)) return;
-    setLikedMembers([...likedMembers, memberId]);
-    setNotification('已点赞！对方会收到你的鼓励哦～');
+  const handleGroupLike = async (memberId: string) => {
+    if (!currentGroup || !user) return;
+    const member = currentGroup.members.find(m => m.id === memberId);
+    if (member?.todayLikes?.includes(user.id)) return; // Already liked
+
+    try {
+        await likeMember(currentGroup.id, memberId);
+        setNotification('已点赞！对方会收到你的鼓励～');
+    } catch (e) {
+        setNotification('点赞失败，请稍后重试');
+    }
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleGroupRemind = async (memberId: string) => {
+    if (!currentGroup || !user) return;
+    try {
+        await remindMember(currentGroup.id, memberId);
+        setNotification('已发送提醒！');
+    } catch (e) {
+        setNotification('提醒发送失败，请稍后重试');
+    }
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleGroupCheckIn = async () => {
+    if (!currentGroup) return;
+    try {
+        await checkInGroup(currentGroup.id);
+        setNotification('打卡成功！');
+    } catch (e: any) {
+        alert(e.message || '打卡失败');
+    }
     setTimeout(() => setNotification(null), 3000);
   };
 
@@ -64,14 +96,6 @@ export default function GroupPage() {
     navigator.clipboard.writeText(currentGroup?.inviteCode || '');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCopyToken = () => {
-    if (!currentGroup) return;
-    const token = getGroupShareToken(currentGroup.id);
-    navigator.clipboard.writeText(token);
-    setTokenCopied(true);
-    setTimeout(() => setTokenCopied(false), 2000);
   };
 
   const handleJoin = async () => {
@@ -142,13 +166,6 @@ export default function GroupPage() {
     }
   };
 
-  const simulateCheckIn = (memberId: string, memberName: string) => {
-    if (!currentGroup) return;
-    syncUserCheckIn(currentGroup.id, memberId, true);
-    setNotification(`${memberName} 完成了今日打卡！`);
-    setTimeout(() => setNotification(null), 3000);
-  };
-
   // --- Render: Group List View ---
   if (!activeGroupId) {
     return (
@@ -186,7 +203,7 @@ export default function GroupPage() {
                 <div className="relative">
                     <input 
                         type="text" 
-                        placeholder="输入邀请码或跨设备口令"
+                        placeholder="输入邀请码"
                         value={joinCode}
                         onChange={e => setJoinCode(e.target.value)}
                         className="w-full bg-white border border-gray-200 py-3 pl-4 pr-12 rounded-xl focus:outline-none focus:border-indigo-500 transition-colors"
@@ -200,7 +217,7 @@ export default function GroupPage() {
                     </button>
                 </div>
                 <p className="text-xs text-gray-400 mt-2 px-1">
-                    * 6位邀请码仅限本机或同服务器测试；跨设备/浏览器请向团长索要“跨设备口令”
+                    * 仅支持邀请码加入
                 </p>
             </div>
         )}
@@ -429,18 +446,43 @@ export default function GroupPage() {
                     
                     {!isDissolved && (
                         <div className="flex items-center gap-2">
-                            {/* Like Button */}
-                            {member.hasCheckedInToday && !isMe && (
+                            {/* Me: Check In Button */}
+                            {isMe && !member.hasCheckedInToday && (
                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); handleLike(member.id); }}
-                                    className={`p-2 rounded-full transition-colors ${
-                                        likedMembers.includes(member.id) 
-                                        ? 'text-pink-500 bg-pink-50' 
-                                        : 'text-gray-300 hover:text-pink-500 hover:bg-pink-50'
-                                    }`}
+                                    onClick={handleGroupCheckIn}
+                                    className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-1"
                                 >
-                                    <Heart size={20} fill={likedMembers.includes(member.id) ? "currentColor" : "none"} />
+                                    <Check size={14} /> 打卡
                                 </button>
+                            )}
+
+                            {/* Like Button (Always visible for others) */}
+                            {!isMe && (
+                                <div className="flex items-center gap-2">
+                                    {/* Remind Button (Only if not checked in) */}
+                                    {!member.hasCheckedInToday && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleGroupRemind(member.id); }}
+                                            className="flex items-center gap-1 px-3 py-1.5 bg-white text-gray-400 border border-gray-200 rounded-full hover:border-indigo-300 hover:text-indigo-500 transition-all"
+                                        >
+                                            <Bell size={16} />
+                                            {/* <span className="text-xs font-bold">提醒</span> */}
+                                        </button>
+                                    )}
+
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); handleGroupLike(member.id); }}
+                                        disabled={member.todayLikes?.includes(user?.id || '')}
+                                        className={`flex items-center gap-1 px-3 py-1.5 rounded-full transition-all ${
+                                            member.todayLikes?.includes(user?.id || '') 
+                                            ? 'bg-pink-50 text-pink-400 border border-pink-100 cursor-default' 
+                                            : 'bg-white text-gray-400 border border-gray-200 hover:border-pink-300 hover:text-pink-500'
+                                        }`}
+                                    >
+                                        <Heart size={16} fill={member.todayLikes?.includes(user?.id || '') ? "currentColor" : "none"} />
+                                        {/* <span className="text-xs font-bold">{member.todayLikes?.includes(user?.id || '') ? '已赞' : '点赞'}</span> */}
+                                    </button>
+                                </div>
                             )}
                             
                             {/* Kick Button (Leader Only) */}
@@ -453,16 +495,7 @@ export default function GroupPage() {
                                 </button>
                             )}
 
-                            {/* Simulation Button (Dev) */}
-                            {!member.hasCheckedInToday && !isMe && (
-                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); simulateCheckIn(member.id, member.nickname); }}
-                                    className="p-1 text-xs text-indigo-300 border border-indigo-100 rounded opacity-50 hover:opacity-100"
-                                    title="模拟打卡"
-                                 >
-                                    <Zap size={12} />
-                                 </button>
-                            )}
+                            {/* Simulation removed */}
                         </div>
                     )}
                 </div>
@@ -480,17 +513,7 @@ export default function GroupPage() {
           )}
       </div>
 
-      {/* Dev Tool: Simulate Join */}
-      {!isDissolved && currentGroup.members.length < (currentGroup.maxMembers || 3) && (
-        <div className="mt-8 text-center">
-            <button 
-                onClick={() => simulateMemberJoin(currentGroup.id)}
-                className="text-xs text-gray-400 underline hover:text-indigo-500"
-            >
-                [模拟] 新成员加入
-            </button>
-        </div>
-      )}
+      {/* Removed dev simulation for new member */}
 
       {/* Invite Modal */}
       {showInvite && (
@@ -516,22 +539,7 @@ export default function GroupPage() {
                     </div>
                 </div>
 
-                <div className="bg-amber-50 p-4 rounded-xl mb-6 border border-amber-100">
-                     <div className="text-xs text-amber-600 mb-2 text-left font-bold flex items-center gap-1">
-                        <Zap size={12} /> 跨设备/浏览器专用
-                     </div>
-                     <p className="text-[10px] text-amber-600/80 text-left mb-3 leading-tight">
-                        因无后台服务器，不同设备请使用此口令同步数据。
-                        <br/>注：团长无法看到新成员加入。
-                     </p>
-                     <button 
-                        onClick={handleCopyToken}
-                        className="w-full bg-white border border-amber-200 text-amber-600 py-2 rounded-lg text-sm font-medium hover:bg-amber-50 transition-colors flex items-center justify-center gap-2"
-                     >
-                        {tokenCopied ? <Check size={16} /> : <Copy size={16} />}
-                        {tokenCopied ? '已复制口令' : '复制跨设备数据口令'}
-                     </button>
-                </div>
+                {/* Removed cross设备/浏览器专用口令区域 */}
                 
                 <div className="flex gap-3">
                     <button 

@@ -41,4 +41,19 @@ export const groupApi = {
         const response = await api.put<Group>(`/groups/${groupId}`, updates);
         return response.data;
     },
+
+    checkInGroup: async (groupId: string, userId: string) => {
+    const response = await api.post<{ message: string; streak: number }>(`/groups/${groupId}/checkin`, { userId });
+    return response.data;
+  },
+
+  likeMember: async (groupId: string, memberId: string, likerId: string) => {
+    const response = await api.post<{ message: string; liked: boolean }>(`/groups/${groupId}/members/${memberId}/like`, { likerId });
+    return response.data;
+  },
+
+  remindMember: async (groupId: string, memberId: string, reminderId: string) => {
+    const response = await api.post<{ message: string }>(`/groups/${groupId}/members/${memberId}/remind`, { reminderId });
+    return response.data;
+  },
 };

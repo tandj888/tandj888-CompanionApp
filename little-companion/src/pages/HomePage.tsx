@@ -18,7 +18,6 @@ export default function HomePage() {
   
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [currentCheckInGoalId, setCurrentCheckInGoalId] = useState<string | null>(null);
-  const [anonymousMsg, setAnonymousMsg] = useState<string | undefined>();
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   
@@ -43,13 +42,6 @@ export default function HomePage() {
     setCurrentCheckInGoalId(goalId);
     checkIn(goalId);
     addStars(1);
-    
-    setTimeout(() => {
-        const today = getTodayCheckIn(goalId);
-        if (today?.anonymousLike) {
-            setAnonymousMsg(today.anonymousLike);
-        }
-    }, 0);
 
     setShowSuccessModal(true);
   };
@@ -300,12 +292,7 @@ export default function HomePage() {
               你真棒～ 获得 1 颗陪伴星
             </p>
             
-            {anonymousMsg && (
-                <div className="bg-amber-50 text-amber-600 p-4 rounded-xl mb-6 text-sm font-medium animate-in slide-in-from-bottom-2">
-                    <p>💌 收到一个匿名小赞：</p>
-                    <p className="mt-1">"{anonymousMsg}"</p>
-                </div>
-            )}
+           
 
             <div className="space-y-3">
               <button

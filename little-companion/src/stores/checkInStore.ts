@@ -5,6 +5,8 @@ import { format, subDays } from 'date-fns';
 import { useGoalStore } from './goalStore';
 import { useUserStore } from './userStore';
 import { checkInApi } from '../api/checkInApi';
+import { microRecordApi } from '../api/microRecordApi';
+import { useMicroRecordStore } from './microRecordStore';
 
 interface CheckInState {
   checkIns: CheckIn[];
@@ -14,17 +16,10 @@ interface CheckInState {
   getStreak: (goalId?: string) => number;
   getCumulativeCheckIns: (goalId: string) => number;
   syncWithBackend: () => Promise<void>;
+  addLikeToUserToday: (userId: string) => Promise<boolean>;
 }
 
-const ANONYMOUS_MESSAGES = [
-  "你好棒！继续加油呀～",
-  "微小的坚持，终将成就更好的你✨",
-  "今天也做到啦，太厉害啦！",
-  "陪伴你的第N天，一起变得更好～",
-  "不慌不忙，慢慢成长，你超优秀！",
-  "今天的你也闪闪发光呢！",
-  "坚持就是胜利，为你点赞！",
-];
+// Removed anonymous like mock messages
 
 export const useCheckInStore = create<CheckInState>()(
   persist(
@@ -61,12 +56,6 @@ export const useCheckInStore = create<CheckInState>()(
         // Check for supervisor notification
 
         
-        // Randomly assign anonymous like
-        const hasAnonymousLike = Math.random() > 0.3; 
-        const anonymousLike = hasAnonymousLike 
-          ? ANONYMOUS_MESSAGES[Math.floor(Math.random() * ANONYMOUS_MESSAGES.length)]
-          : undefined;
-
         const user = useUserStore.getState().user;
 
         const newCheckIn: CheckIn = {
@@ -78,7 +67,6 @@ export const useCheckInStore = create<CheckInState>()(
           record,
           starsEarned: 1,
           likes: [],
-          anonymousLike,
           timestamp: Date.now(),
         };
 
@@ -219,6 +207,30 @@ export const useCheckInStore = create<CheckInState>()(
               } catch (e) {
                   console.error("Failed to fetch check-ins", e);
               }
+          }
+      },
+      addLikeToUserToday: async (targetUserId) => {
+          try {
+              const today = format(new Date(), 'yyyy-MM-dd');
+              const targetCheckIns = await checkInApi.getCheckIns({ userId: targetUserId, date: today });
+              const target = targetCheckIns?.[0];
+              if (!target) return false;
+              const me = useUserStore.getState().user;
+              if (!me?.id) return false;
+              const likes = Array.isArray(target.likes) ? target.likes : [];
+              if (likes.includes(me.id)) return true;
+              const updated = await checkInApi.updateCheckIn(target.id, { likes: [...likes, me.id] });
+              // If the liked target is myself, update local state; otherwise, rely on their device to sync
+              const myId = useUserStore.getState().user?.id;
+              if (target.userId === myId) {
+                 set((state) => ({
+                   checkIns: state.checkIns.map(c => c.id === target.id ? updated : c)
+                 }));
+              }
+              return true;
+          } catch (e) {
+              console.error("Failed to add like", e);
+              return false;
           }
       }
     }),

@@ -10,6 +10,7 @@ interface GiftState {
   fetchGifts: () => Promise<void>;
   fetchRedemptions: () => Promise<void>;
   addGift: (gift: Omit<Gift, 'id'>) => Promise<void>;
+  removeGift: (id: string) => Promise<void>;
   redeemGift: (userId: string, giftId: string) => Promise<{ success: boolean; message: string }>;
   syncWithBackend: () => Promise<void>;
 }

@@ -9,6 +9,11 @@ import { CheckInController } from "./controller/CheckInController"
 import { GroupController } from "./controller/GroupController"
 import { MicroRecordController } from "./controller/MicroRecordController"
 import { GiftController } from "./controller/GiftController"
+import { ArticleController } from "./controller/ArticleController"
+import { InteractionController } from "./controller/InteractionController"
+import { NotificationController } from "./controller/NotificationController"
+import { UploadController, upload } from "./controller/UploadController"
+import path from "path"
 
 dotenv.config()
 
@@ -16,7 +21,10 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ limit: '50mb', extended: true }))
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 const userController = new UserController()
 const goalController = new GoalController()
@@ -24,10 +32,17 @@ const checkInController = new CheckInController()
 const groupController = new GroupController()
 const microRecordController = new MicroRecordController()
 const giftController = new GiftController()
+const articleController = new ArticleController()
+const interactionController = new InteractionController()
+const notificationController = new NotificationController()
+const uploadController = new UploadController()
 
 app.get("/", (req, res) => {
     res.send("Little Companion Backend API is Running")
 })
+
+// Upload Route
+app.post("/api/upload", upload.single('file'), (req, res) => uploadController.uploadFile(req, res))
 
 // User Routes
 app.post("/api/auth/register", (req, res) => userController.register(req, res))
@@ -56,6 +71,9 @@ app.post("/api/groups/leave", (req, res) => groupController.leaveGroup(req, res)
 app.post("/api/groups/dissolve", (req, res) => groupController.dissolveGroup(req, res))
 app.post("/api/groups/kick", (req, res) => groupController.kickMember(req, res))
 app.put("/api/groups/:id", (req, res) => groupController.updateGroup(req, res))
+app.post("/api/groups/:id/checkin", (req, res) => groupController.checkIn(req, res));
+app.post("/api/groups/:groupId/members/:memberId/like", (req, res) => groupController.likeMember(req, res));
+app.post("/api/groups/:groupId/members/:memberId/remind", (req, res) => groupController.remindMember(req, res));
 
 // MicroRecord Routes
 app.post("/api/micro-records", (req, res) => microRecordController.createRecord(req, res))
@@ -68,6 +86,28 @@ app.post("/api/gifts", (req, res) => giftController.createGift(req, res))
 app.post("/api/gifts/redeem", (req, res) => giftController.redeemGift(req, res))
 app.delete("/api/gifts/:id", (req, res) => giftController.deleteGift(req, res))
 app.get("/api/redemptions", (req, res) => giftController.getRedemptions(req, res))
+
+// Article Routes
+app.post("/api/articles", (req, res) => articleController.createArticle(req, res))
+app.get("/api/articles", (req, res) => articleController.getArticles(req, res))
+app.get("/api/articles/:id", (req, res) => articleController.getArticle(req, res))
+app.put("/api/articles/:id", (req, res) => articleController.updateArticle(req, res))
+app.delete("/api/articles/:id", (req, res) => articleController.deleteArticle(req, res))
+
+// Interaction Routes
+app.post("/api/comments", (req, res) => interactionController.addComment(req, res))
+app.get("/api/comments/:articleId", (req, res) => interactionController.getComments(req, res))
+app.post("/api/likes", (req, res) => interactionController.toggleLike(req, res))
+app.get("/api/likes/status", (req, res) => interactionController.getLikeStatus(req, res))
+app.post("/api/favorites", (req, res) => interactionController.toggleFavorite(req, res))
+app.get("/api/favorites/status", (req, res) => interactionController.getFavoriteStatus(req, res))
+app.post("/api/follows", (req, res) => interactionController.toggleFollow(req, res))
+app.get("/api/follows/status", (req, res) => interactionController.getFollowStatus(req, res))
+
+// Notification Routes
+app.get("/api/notifications/:userId", (req, res) => notificationController.getNotifications(req, res))
+app.put("/api/notifications/:id/read", (req, res) => notificationController.markAsRead(req, res))
+app.put("/api/notifications/read-all", (req, res) => notificationController.markAllAsRead(req, res))
 
 // Legacy Routes (for testing)
 app.get("/users", async (req, res) => {

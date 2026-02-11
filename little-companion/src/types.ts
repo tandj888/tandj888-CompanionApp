@@ -32,6 +32,7 @@ export interface GroupMember extends User {
   hasCheckedInToday: boolean;
   streak: number;
   totalCheckIns?: number;
+  todayLikes?: string[]; // User IDs who liked this member today
 }
 
 export interface Badge {
@@ -173,4 +174,61 @@ export interface RedemptionRecord {
   cost: number;
   timestamp: number;
   status: 'pending' | 'completed' | 'rejected';
+}
+
+export interface Notification {
+  id: string;
+  type: 'like' | 'system';
+  content: string;
+  timestamp: number;
+  read: boolean;
+  likerId?: string;
+}
+
+export interface Article {
+  id: string;
+  title: string;
+  content: string;
+  coverImage?: string;
+  images?: string[];
+  tags: string[];
+  status: 'draft' | 'published';
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  isRecommended: boolean;
+  author: User;
+  authorId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  articleId: string;
+  user: User;
+  userId: string;
+  parentId?: string;
+  images?: string[];
+  likeCount: number;
+  createdAt: string;
+}
+
+export interface CreateArticleDTO {
+  title: string;
+  content: string;
+  coverImage?: string;
+  images?: string[];
+  tags: string[];
+  userId: string;
+  status?: 'draft' | 'published';
+}
+
+export interface CreateCommentDTO {
+  articleId: string;
+  userId: string;
+  content: string;
+  parentId?: string;
+  images?: string[];
 }

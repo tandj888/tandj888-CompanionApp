@@ -12,10 +12,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@types/multer": "^2.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "mssql": "^12.2.0",
+    "multer": "^2.0.2",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^0.3.28"
   },

@@ -25,6 +25,9 @@ export class GroupMember {
     @Column({ default: 0 })
     streak: number;
 
+    @Column("simple-array", { nullable: true })
+    todayLikes: string[];
+
     @Column("simple-json", { nullable: true })
     redeemedRewards: string[];
 }

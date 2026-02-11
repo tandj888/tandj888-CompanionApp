@@ -77,7 +77,8 @@ export class UserController {
     async getProfile(req: Request, res: Response) {
         try {
             const id = req.params.id as string;
-            const user = await this.userRepository.findOne({ where: { id } });
+            const users = await this.userRepository.find({ where: { id } });
+            const user = users[0];
             
             if (!user) {
                 return res.status(404).json({ message: "User not found" });
