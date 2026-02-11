@@ -85,7 +85,7 @@ export default function NotificationCenterPage() {
                         {n.content}
                     </p>
                     <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                        {formatDistanceToNow(new Date(n.createdAt || Date.now()), { addSuffix: true, locale: zhCN })}
+                        {formatDistanceToNow(new Date(n.timestamp || Date.now()), { addSuffix: true, locale: zhCN })}
                     </p>
                 </div>
                 {!n.read && (

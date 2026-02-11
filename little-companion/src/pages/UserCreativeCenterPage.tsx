@@ -199,7 +199,7 @@ export default function UserCreativeCenterPage() {
                                 <p className="text-sm font-bold text-gray-900">{notification.title}</p>
                                 <p className="text-sm text-gray-600 mt-1 line-clamp-2">{notification.content}</p>
                                 <p className="text-xs text-gray-400 mt-2">
-                                    {format(new Date(notification.createdAt), 'MM-dd HH:mm')}
+                                    {format(new Date(notification.timestamp), 'MM-dd HH:mm')}
                                 </p>
                             </div>
                         </div>

@@ -342,7 +342,7 @@ export default function GroupPage() {
             <h3 className="font-bold text-gray-800 px-2">成员列表 ({currentGroup.members.length})</h3>
             {currentGroup.members.map((member, index) => {
                 const isMe = member.id === user?.id;
-                const isCheckedIn = member.lastCheckInDate === format(new Date(), 'yyyy-MM-dd');
+                const isCheckedIn = member.hasCheckedInToday;
                 
                 return (
                     <div key={member.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">

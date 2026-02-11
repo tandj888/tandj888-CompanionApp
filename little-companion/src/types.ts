@@ -178,11 +178,12 @@ export interface RedemptionRecord {
 
 export interface Notification {
   id: string;
-  type: 'like' | 'system';
+  type: 'like' | 'system' | 'comment' | 'follow';
   content: string;
   timestamp: number;
   read: boolean;
   likerId?: string;
+  title?: string; // Optional title
 }
 
 export interface Article {
