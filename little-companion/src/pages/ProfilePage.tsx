@@ -97,94 +97,112 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="p-6 pt-12 min-h-screen bg-gray-50 pb-24">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">个人中心</h1>
-        <div className="flex gap-4">
-            <button onClick={toggleAdminRole}>
-                <Settings size={24} className={user.role === 'admin' ? 'text-indigo-600' : 'text-gray-400'} />
+    <div className="min-h-screen bg-gray-50/50 pb-24">
+      {/* Header Background */}
+      <div className="bg-indigo-600 h-48 rounded-b-[3rem] relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-90"></div>
+        <div className="absolute top-0 left-0 w-full h-full opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+      </div>
+
+      <div className="px-6 -mt-32 relative z-10">
+        <div className="flex justify-between items-center mb-6 text-white">
+            <h1 className="text-2xl font-bold tracking-wide">个人中心</h1>
+            <button onClick={toggleAdminRole} className="p-2 bg-white/10 rounded-full backdrop-blur-sm hover:bg-white/20 transition-colors">
+                <Settings size={20} className="text-white" />
             </button>
         </div>
-      </div>
 
-      <div className="flex items-center gap-4 mb-8 bg-white p-4 rounded-2xl shadow-sm relative">
-        <img src={user.avatar} className="w-16 h-16 rounded-full bg-gray-200" />
-        <div className="flex-1">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            {user.nickname}
-            {user.role === 'admin' && <span className="bg-indigo-100 text-indigo-600 text-xs px-2 py-0.5 rounded-full">管理员</span>}
-          </h2>
-          <p className="text-sm text-gray-500">UID: {user.id}</p>
-          {user.phone && <p className="text-xs text-gray-400 mt-1">手机: {user.phone}</p>}
-          <p className="text-sm text-indigo-500 mt-1">陪伴等级 Lv.{user.level}</p>
-        </div>
-        <button onClick={openProfileEdit} className="absolute right-4 top-4 text-gray-400 p-2">
-            <Edit2 size={20} />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white p-4 rounded-2xl text-center shadow-sm">
-          <p className="text-xl font-bold text-gray-900">{checkIns.length}</p>
-          <p className="text-xs text-gray-500 mt-1">累计打卡</p>
-        </div>
-        <div className="bg-white p-4 rounded-2xl text-center shadow-sm">
-          <p className="text-xl font-bold text-gray-900">{getStreak()}</p>
-          <p className="text-xs text-gray-500 mt-1">连续坚持</p>
-        </div>
-        <div className="bg-white p-4 rounded-2xl text-center shadow-sm">
-          <p className="text-xl font-bold text-gray-900">{user.stars}</p>
-          <p className="text-xs text-gray-500 mt-1">陪伴星</p>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {/* Creator Center Entry */}
-        <button 
-          onClick={() => navigate('/creative-center')}
-          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 p-4 rounded-xl flex justify-between items-center text-white shadow-lg shadow-purple-200 mb-2"
-        >
-          <span className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-white/20 text-white">
-                <Edit2 size={20} />
+        <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl shadow-xl shadow-indigo-100/50 mb-6 border border-white/50 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
+            <div className="relative flex items-center gap-5">
+                <div className="relative">
+                    <img src={user.avatar} className="w-20 h-20 rounded-full bg-gray-200 border-4 border-white shadow-md object-cover" />
+                    {user.role === 'admin' && (
+                        <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-1 rounded-full border-2 border-white">
+                            <Shield size={12} />
+                        </div>
+                    )}
+                </div>
+                <div className="flex-1">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                        {user.nickname}
+                    </h2>
+                    <p className="text-xs text-gray-400 mt-1 font-mono">ID: {user.id}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                        <span className="bg-indigo-50 text-indigo-600 text-xs px-3 py-1 rounded-full font-bold">Lv.{user.level}</span>
+                        {user.phone && <span className="text-xs text-gray-400">{user.phone}</span>}
+                    </div>
+                </div>
+                <button onClick={openProfileEdit} className="text-gray-400 hover:text-indigo-600 p-2 transition-colors">
+                    <Edit2 size={20} />
+                </button>
             </div>
-            <div className="text-left">
-                <p className="font-bold">我的创作中心</p>
-                <p className="text-xs opacity-80">查看作品、互动消息与数据</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-white p-5 rounded-2xl text-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 hover:transform hover:-translate-y-1 transition-transform duration-300">
+                <p className="text-2xl font-extrabold text-gray-800">{checkIns.length}</p>
+                <p className="text-xs text-gray-400 mt-1 font-medium">累计打卡</p>
             </div>
-          </span>
-          <ChevronRight size={20} className="text-white/80" />
-        </button>
+            <div className="bg-white p-5 rounded-2xl text-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 hover:transform hover:-translate-y-1 transition-transform duration-300">
+                <p className="text-2xl font-extrabold text-gray-800">{getStreak()}</p>
+                <p className="text-xs text-gray-400 mt-1 font-medium">连续坚持</p>
+            </div>
+            <div className="bg-white p-5 rounded-2xl text-center shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 hover:transform hover:-translate-y-1 transition-transform duration-300">
+                <p className="text-2xl font-extrabold text-yellow-500">{user.stars}</p>
+                <p className="text-xs text-gray-400 mt-1 font-medium">陪伴星</p>
+            </div>
+        </div>
+
+        <div className="space-y-4">
+            {/* Creator Center Entry */}
+            <button 
+                onClick={() => navigate('/creative-center')}
+                className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 p-1 rounded-2xl shadow-lg shadow-indigo-200 transition-transform active:scale-98"
+            >
+                <div className="bg-white/10 backdrop-blur-sm p-4 rounded-xl flex justify-between items-center text-white">
+                    <span className="flex items-center gap-4">
+                        <div className="p-2.5 rounded-xl bg-white/20 text-white shadow-inner">
+                            <Edit2 size={20} />
+                        </div>
+                        <div className="text-left">
+                            <p className="font-bold text-lg">创作中心</p>
+                            <p className="text-xs text-white/70">管理作品与查看数据</p>
+                        </div>
+                    </span>
+                    <ChevronRight size={20} className="text-white/60" />
+                </div>
+            </button>
 
         {/* My Favorites */}
         <button 
           onClick={() => navigate('/favorites')}
-          className="w-full bg-white p-4 rounded-xl flex justify-between items-center text-gray-700 shadow-sm"
+          className="w-full bg-white p-4 rounded-2xl flex justify-between items-center text-gray-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 hover:bg-gray-50 transition-colors"
         >
-          <span className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-yellow-50 text-yellow-500">
+          <span className="flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-500">
                 <Bookmark size={20} />
             </div>
-            <span>我的收藏</span>
+            <span className="font-medium">我的收藏</span>
           </span>
           <ChevronRight size={20} className="text-gray-300" />
         </button>
 
         <button 
           onClick={() => navigate('/notifications')}
-          className="w-full bg-white p-4 rounded-xl flex justify-between items-center text-gray-700 shadow-sm"
+          className="w-full bg-white p-4 rounded-2xl flex justify-between items-center text-gray-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 hover:bg-gray-50 transition-colors"
         >
-          <span className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-pink-50 text-pink-600 relative">
+          <span className="flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-pink-50 text-pink-500 relative">
                 <Heart size={20} />
                 {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white"></span>
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
                 )}
             </div>
-            <span>互动消息</span>
+            <span className="font-medium">互动消息</span>
             {unreadCount > 0 && (
-                <span className="bg-red-50 text-red-500 text-xs px-2 py-0.5 rounded-full font-medium">
-                    {unreadCount}条未读
+                <span className="bg-red-50 text-red-500 text-xs px-2.5 py-1 rounded-full font-bold ml-2">
+                    {unreadCount}
                 </span>
             )}
           </span>
@@ -194,16 +212,16 @@ export default function ProfilePage() {
         {/* Reminder Settings Button */}
         <button 
           onClick={() => setShowReminderSettings(true)}
-          className="w-full bg-white p-4 rounded-xl flex justify-between items-center text-gray-700 shadow-sm"
+          className="w-full bg-white p-4 rounded-2xl flex justify-between items-center text-gray-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 hover:bg-gray-50 transition-colors"
         >
-          <span className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${user.settings.reminder?.enabled ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-400'}`}>
+          <span className="flex items-center gap-4">
+            <div className={`p-2.5 rounded-xl ${user.settings.reminder?.enabled ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-100 text-gray-400'}`}>
                 <Bell size={20} />
             </div>
-            <span>打卡提醒</span>
+            <span className="font-medium">打卡提醒</span>
           </span>
           <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">
+              <span className="text-sm text-gray-400 font-medium">
                 {user.settings.reminder?.enabled 
                     ? `${user.settings.reminder.startTime}开始` 
                     : '已关闭'}
@@ -214,39 +232,39 @@ export default function ProfilePage() {
 
         <button 
           onClick={() => navigate('/badges')}
-          className="w-full bg-white p-4 rounded-xl flex justify-between items-center text-gray-700 shadow-sm"
+          className="w-full bg-white p-4 rounded-2xl flex justify-between items-center text-gray-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 hover:bg-gray-50 transition-colors"
         >
-          <span className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-gray-100 text-gray-400">
+          <span className="flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-500">
                 <Shield size={20} />
             </div>
-            <span>我的勋章</span>
+            <span className="font-medium">我的勋章</span>
           </span>
           <ChevronRight size={20} className="text-gray-300" />
         </button>
 
         <button 
           onClick={() => navigate('/redemption-center')}
-          className="w-full bg-white p-4 rounded-xl flex justify-between items-center text-gray-700 shadow-sm"
+          className="w-full bg-white p-4 rounded-2xl flex justify-between items-center text-gray-700 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 hover:bg-gray-50 transition-colors"
         >
-          <span className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-gray-100 text-gray-400">
+          <span className="flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-orange-50 text-orange-500">
                 <Gift size={20} />
             </div>
-            <span>兑换中心</span>
+            <span className="font-medium">兑换中心</span>
           </span>
           <ChevronRight size={20} className="text-gray-300" />
         </button>
 
         <button 
           onClick={handleLogout}
-          className="w-full bg-white p-4 rounded-xl flex justify-between items-center text-red-500 shadow-sm mt-8"
+          className="w-full bg-white p-4 rounded-2xl flex justify-between items-center text-red-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-red-50 hover:bg-red-50 transition-colors mt-8"
         >
-          <span className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-red-50">
+          <span className="flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-red-50 text-red-500">
                 <LogOut size={20} />
             </div>
-            <span>退出登录</span>
+            <span className="font-medium">退出登录</span>
           </span>
         </button>
       </div>
